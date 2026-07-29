@@ -45,6 +45,106 @@ Typical columns: `post_id`, `corpus`, `subreddit`, `title`, `body`, `text`, `cre
 
 ---
 
+## Results so far (analysis corpus: A = 906, B = 687)
+
+All figures below are from the **current sample**, not the long-term target of ~10k posts per corpus. Scraping is paused; more data would require re-running analysis as a new sampling frame.
+
+### Project status
+
+| Stage | Status | Notes |
+|-------|--------|--------|
+| Data collection | Partial | Clean analysis CSVs in repo; volume far below 10k×2 target |
+| Seed dictionary | Done | 4 domains, 71 anchors (`config/anchors.yaml`) |
+| Semantic comparison (Phase 2) | Done | PPMI, frozen BERT, Word2Vec, FastText |
+| Emotion windows (Phase 3) | Done | DistilRoBERTa-emotion; ABSA-style **proxy** (not trained ABSA) |
+| Co-occurrence networks | Done | PPMI-weighted graphs (exploratory) |
+| Topic model (Phase 4) | Done | Pooled NMF, k = 8 by stability |
+| Manual emotion annotation | Template only | 150-window sample prepared; coding not finished |
+
+### Seed domains
+
+| Domain | Focus (keywords include) |
+|--------|---------------------------|
+| **Temporal** | timezone, weekend, schedule, distance, stuck, … |
+| **Identity** | name, accent, belong, culture shock, foreigner, … |
+| **Absence** | alone, lost, gone, missing, ghost, funeral, … |
+| **Digital** | skype, screen, wifi, video call, connection, … |
+
+### 1. Semantic similarity (Corpus A vs B)
+
+We compare how each domain is represented in migration vs grief posts.  
+**cos\*** = attenuation-corrected cosine (higher ≈ more similar across corpora).  
+Significance uses post-level resampling and Benjamini–Hochberg FDR where applicable.
+
+| Domain | PPMI cos\* | PPMI different A vs B? | BERT cos\* | BERT residual difference? |
+|--------|------------:|:----------------------:|------------:|:-------------------------:|
+| Temporal | 0.72 | **Yes** (q ≈ 0.003) | 0.91 | Yes (q = 0.002) |
+| Absence | 0.60 | **Yes** (q ≈ 0.003) | 0.91 | Yes (q = 0.002) |
+| Identity | 0.58 | **Yes** (q ≈ 0.003) | 0.82 | Yes (q = 0.002) |
+| Digital | 0.80 | No (q ≈ 0.08) | 0.96 | Yes (q = 0.002) |
+
+**How to read this**
+
+- **PPMI** measures collocational overlap (local co-occurrence profiles). Migration and grief **diverge** clearly for Temporal, Absence, and Identity; Digital is borderline.
+- **BERT** (frozen `bert-base-uncased`) measures pretrained contextual senses. Domains are **mostly similar** across corpora (high cos\*), but still not interchangeable under a label-permutation null.
+- These are **complementary**, not contradictory.
+
+**Word2Vec & FastText (trained on these texts)** were also run with the same reliability design (not rejected without evidence):
+
+| Method | Domain profile reliability (mean A / B) | Neighbour-list Jaccard (mean A / B) | Domain cos\* (approx.) |
+|--------|------------------------------------------|-------------------------------------|-------------------------|
+| BERT | 0.99 / 0.98 | **0.53 / 0.48** | 0.82–0.96 |
+| FastText | 1.00 / 1.00 | 0.11 / 0.09 | ~0.98–0.99 |
+| Word2Vec | 0.99 / 0.99 | 0.12 / 0.06 | ~0.98–0.99 |
+| PPMI | 0.50 / 0.53 | 0.06 / 0.05 | 0.58–0.80 |
+
+Chance neighbour Jaccard ≈ **0.014**.
+
+**Takeaway at this sample size**
+
+1. W2V/FT **domain profiles** are stable (high reliability).  
+2. Their **top-15 neighbour lists** are only modestly above chance and much less stable than BERT’s — so neighbour tables from W2V/FT are weak findings here.  
+3. W2V/FT **cos\*** is near 1 (little A/B contrast). **PPMI** is most discriminative for collocates; **BERT** sits in between.  
+4. At ~10k posts/corpus, the same battery should be re-run before stronger claims about predictive embeddings.
+
+Usable individual anchors (frequency ≥ 20 in the weaker corpus **and** reliability gate): about **12/71** under PPMI and **8/71** under BERT. Prefer **domain-level** claims.
+
+### 2. Emotion around anchors (Phase 3)
+
+Model: `j-hartmann/emotion-english-distilroberta-base` (7 classes).  
+Design: sentence-clipped ±5-token windows; one post per author for inference; polysemous anchors excluded from strict estimates; FDR across domain tests.
+
+| Domain | Emotion distribution A vs B | FDR q |
+|--------|----------------------------|------:|
+| Identity | **Different** | 0.006 |
+| Absence | **Different** | 0.0002 |
+| Temporal | **Different** | 0.0003 |
+| Digital | Not significant | 0.80 |
+
+This is a **window proxy** for aspect-based emotion (emotion of local context; aspect ≈ anchor), not a trained ABSA model.
+
+### 3. Topics (Phase 4)
+
+- Method: pooled **NMF** on both corpora, TF–IDF, bootstrap stability selection.  
+- Selected **k = 8**.  
+- Only **Topic 2** meets the high-stability “core” threshold (recurrence ≈ 0.95): study-abroad / university language, **higher loading in Corpus A**.  
+- Other topics (e.g. hospital/loss, homesick, job/move, family bereavement) appear but are **unstable** across restarts — report cautiously.
+
+### 4. What works vs what is weak
+
+| Works well now | Weak / incomplete |
+|----------------|-------------------|
+| Domain-level PPMI and BERT comparison | Sample size ≪ 10k/corpus |
+| Frozen BERT neighbour stability | Most individual anchors too rare for inference |
+| Emotion differences for Identity / Absence / Temporal | Digital emotion n.s.; true ABSA not trained |
+| Explicit multi-method evaluation of W2V/FT | W2V/FT neighbours not trustworthy at this N |
+| Stability-selected topics (honest core count) | Only one core topic |
+
+Longer write-up of methods and tables: [`docs/METHODS_RESULTS.md`](docs/METHODS_RESULTS.md).  
+Full numeric exports (when regenerated locally): `outputs/tables/`, `outputs/figures/`.
+
+---
+
 ## Setup
 
 ### Scrape / Phase 1 environment
