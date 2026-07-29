@@ -1,78 +1,75 @@
 # Migration and Grief Narrative Analysis
 
-Two Reddit corpora for semantic / sentiment / topic analysis:
+Comparative NLP study of two Reddit post corpora:
 
-| Corpus | Subreddits | Theme |
-|--------|------------|--------|
-| **A** | `r/expats`, `r/immigration`, `r/StudyAbroad` | Migration experiences |
-| **B** | `r/GriefSupport`, `r/bereavement` | Loss / grief experiences |
+| Corpus | Theme | Subreddits |
+|--------|--------|------------|
+| **A** | Migration / expat experiences | `r/expats`, `r/immigration`, `r/StudyAbroad` |
+| **B** | Loss / grief experiences | `r/GriefSupport`, `r/bereavement` |
 
-**Rules:** post body only (no comments), &gt;100 words, last 3 years, soft flair preference, exclude visa/tax/paperwork Q&A from Corpus A.
+Posts only (no comments), longer than 100 words, roughly the last three years from mid-2023, with soft flair preference. Corpus A drops visa/tax/paperwork Q&A via keyword filters.
+
+The project supports data collection (Apify), cleaning, and Phases 2–4 analysis: semantic comparison (PPMI, BERT, Word2Vec, FastText), emotion windows, co-occurrence networks, and topic modeling.
+
+---
+
+## Repository contents
+
+```
+config/           # filters, scrape plan, seed dictionary (anchors), analysis knobs
+data/
+  processed/      # Phase 1 cleaned corpus CSVs
+  analysis/       # Corrected analysis corpus CSVs (primary research tables)
+scripts/          # scrape → filter → analysis pipeline
+docs/             # methods notes and scraping ops tips
+tests/            # unit tests for shared analysis helpers
+run_analysis.py   # Phase 2–4 orchestration (PPMI default path)
+run_contextual_phase2.py   # frozen BERT path + methods join
+run_predictive_phase2.py   # Word2Vec / FastText evaluation
+```
+
+### Included data
+
+| File | Rows (approx.) | Role |
+|------|----------------|------|
+| `data/analysis/corpus_a.csv` | 906 | **Primary** migration corpus for Phases 2–4 |
+| `data/analysis/corpus_b.csv` | 687 | **Primary** grief corpus for Phases 2–4 |
+| `data/processed/corpus_a.csv` | 323 | Earlier Phase 1 freeze (pre-filter recovery) |
+| `data/processed/corpus_b.csv` | 687 | Phase 1 grief corpus |
+
+Prefer **`data/analysis/`** for new analysis. The analysis corpus recovers posts that an over-broad keyword filter had dropped from Corpus A (substring false positives). Raw Apify dumps and large intermediates are not in git (regenerate or restore locally).
+
+Typical columns: `post_id`, `corpus`, `subreddit`, `title`, `body`, `text`, `created_at`, `url`, `flair`, `score`, `word_count`, `username`, plus cleaned/token fields depending on stage.
+
+> **Privacy:** CSVs include Reddit identifiers and post text. This repository is private by design. Do not publish row-level dumps without ethics/privacy review.
+
+---
 
 ## Setup
 
+### Scrape / Phase 1 environment
+
 ```powershell
-cd D:\research_paper
+cd <repo>
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
 
-Apify CLI is already used for auth. Either:
+Apify auth (pick one):
 
-- stay logged in via `apify login`, or  
-- set `$env:APIFY_TOKEN = "your_token"`
+- `apify login` (CLI keyring), or  
+- `$env:APIFY_TOKEN = "apify_api_..."` from [Apify Integrations](https://console.apify.com/settings/integrations)
 
-## Pipeline
+### Analysis environment (Phases 2–4)
 
-### 1. Pilot scrape (cheap)
-
-```powershell
-python scripts/01_scrape_apify.py --mode pilot --corpus both --listings-only
-```
-
-### 2. Full scrape (costs Apify credits)
+Uses a **separate** venv so the torch/transformers stack does not disturb Phase 1.
 
 ```powershell
-# Preview planned runs
-python scripts/01_scrape_apify.py --mode full --corpus both --dry-run
-
-python scripts/01_scrape_apify.py --mode full --corpus a
-python scripts/01_scrape_apify.py --mode full --corpus b
-```
-
-### 3. Filter & normalize
-
-```powershell
-python scripts/03_filter_and_normalize.py
-```
-
-### 4. NLP clean + lemmatize
-
-```powershell
-python scripts/04_preprocess_nlp.py
-```
-
-### Corpus status
-
-Phase 1 output under `data/processed/` is frozen. A bounded-keyword audit found that
-substring matching had incorrectly removed posts containing words such as `already`,
-`first`, and `competition`. The corrected Phase 2-4 analysis corpus is written to
-`data/analysis/`, not back into Phase 1:
-
-- Corpus A: 906 migration posts, 123,066 lemma tokens
-- Corpus B: 687 grief posts, 109,009 lemma tokens
-
-Scraping remains paused. New collection must be treated as a new sampling frame and
-must not be silently merged into the current prevalence corpus.
-
-## Phase 2-4 analysis
-
-Create and verify the dedicated environment:
-
-```powershell
-C:\Users\harsh\anaconda3\python.exe -m venv .venv-analysis
+# Use a Python 3.12 base that matches your machine
+python -m venv .venv-analysis
+.\.venv-analysis\Scripts\python.exe -m pip install -U pip
 .\.venv-analysis\Scripts\python.exe -m pip install -r requirements.txt -r requirements-analysis.txt -c constraints-analysis.txt
 .\.venv-analysis\Scripts\python.exe -m pip install --index-url https://download.pytorch.org/whl/cpu torch
 .\.venv-analysis\Scripts\python.exe -m pip install -r requirements-analysis-torch.txt -c constraints-analysis.txt
@@ -81,111 +78,84 @@ C:\Users\harsh\anaconda3\python.exe -m venv .venv-analysis
 .\.venv-analysis\Scripts\python.exe scripts\check_env.py
 ```
 
-Run the complete pipeline:
+---
+
+## Data collection (optional)
+
+Scraping costs Apify credits. Pilot first:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python scripts/01_scrape_apify.py --mode pilot --corpus both --listings-only
+```
+
+Full collection (example — sequential is safest on limited concurrent memory):
+
+```powershell
+python scripts/01_scrape_apify.py --mode full --corpus both --engine trudax --searches-only --resume --workers 1 --timeout 3600
+python scripts/03_filter_and_normalize.py
+python scripts/04_preprocess_nlp.py
+```
+
+Config: `config/filters.yaml`, `config/scrape_runs.yaml`.  
+Ops notes: `docs/SPEED.md`, `docs/HOME_RESUME.md`.
+
+---
+
+## Analysis pipeline
+
+Seed dictionary: **4 domains / 71 anchors** in `config/anchors.yaml`  
+(Temporal, Identity, Absence, Digital).
+
+### Default path (PPMI + emotion + topics)
 
 ```powershell
 .\.venv-analysis\Scripts\python.exe run_analysis.py
+.\.venv-analysis\Scripts\python.exe -m pytest
 ```
 
-Reuse existing model outputs and regenerate only figures and the sanitized bundle. This range starts after annotation sampling, so existing manual coding is preserved:
+### Frozen BERT (contextual) path
 
 ```powershell
-.\.venv-analysis\Scripts\python.exe run_analysis.py --from-step semantic-figures --replace-bundle
+.\.venv-analysis\Scripts\python.exe run_contextual_phase2.py
 ```
 
-The pipeline uses four fixed seed-dictionary domains (Temporal, Identity, Absence,
-and Digital), shared-basis PPMI profiles, document-level reliability and resampling,
-seven-class emotion probabilities over sentence-clipped anchor windows, PPMI
-co-occurrence networks, and a pooled NMF topic model selected by bootstrap stability.
+### Word2Vec / FastText (empirical small-corpus evaluation)
 
-Interpretation limits:
+```powershell
+.\.venv-analysis\Scripts\python.exe run_predictive_phase2.py
+```
 
-- Domain is the primary semantic unit; only 12 of 71 anchors pass the combined
-  frequency and reliability gate.
-- Digital full-dictionary results are dominated by polysemous anchors and require
-  manual concordance coding. Its corrected emotion comparison is not significant.
-- Emotion analysis is a window proxy for ABSA, not a trained aspect-specific model.
-- Only 1 of 8 selected topics meets the recurrence threshold: the Study Abroad topic, larger in Corpus A.
-- Co-occurrence networks are exploratory because many high-PPMI edges have low counts.
+Results land under `outputs/tables/`, `outputs/figures/`, `outputs/summaries/` (local; not committed by default).  
+Methods summary: `docs/METHODS_RESULTS.md`.
 
-The only shareable archive is `outputs/research_analysis_bundle_reviewed.zip`.
-Earlier bundle ZIPs are superseded and may contain row-level identifiers; do not distribute them.
+### Method overview
 
-Run tests and coverage:
+| Method | Role |
+|--------|------|
+| **PPMI** | Shared-basis context profiles; strongest A/B collocational contrast |
+| **BERT** (`bert-base-uncased`) | Frozen contextual senses; stable neighbours at current N |
+| **Word2Vec / FastText** | Trained on-site; second-order profiles stable, neighbour lists weak at current N |
+| **Emotion** | DistilRoBERTa-emotion on ±5-token anchor windows (ABSA *proxy*) |
+| **Topics** | Pooled NMF with bootstrap stability (selected k=8) |
+
+Interpretation limits (current sample sizes ~906 / 687):
+
+- Prefer **domain-level** claims; most individual anchors are rare.  
+- Digital domain is fragile (polysemy / sparse tech terms).  
+- Emotion is a window proxy, not a trained aspect model.  
+- Only one NMF topic currently meets the high-stability “core” bar (study-abroad language).
+
+---
+
+## Tests
 
 ```powershell
 .\.venv-analysis\Scripts\python.exe -m pytest
 ```
 
-## Outputs
+---
 
-| Path | Description |
-|------|-------------|
-| `data/raw/` | Raw Apify JSON dumps |
-| `data/interim/corpus_{a,b}.parquet` | Filtered structured posts |
-| `data/processed/corpus_{a,b}.parquet` | Final clean DataFrames |
-| `data/processed/phase1_summary.json` | Counts & QC metrics |
+## License / ethics
 
-Final DataFrame columns include: `post_id`, `corpus`, `subreddit`, `title`, `body`, `text`, `text_clean`, `tokens`, `created_at`, `url`, `flair`, `word_count`, `word_count_clean`.
-
-## Config
-
-- `config/filters.yaml` — date, word count, flairs, exclude keywords  
-- `config/scrape_runs.yaml` — Apify actor, pilot/full limits, listing sorts, search seeds  
-
-## Fire-and-forget (Apify-only; close your laptop)
-
-Starts **only unfinished** search jobs on Apify (skips run names that already have
-≥10 posts locally so you do **not** re-pay for the ~750 posts already scraped).
-
-```powershell
-# Preview what will be skipped vs started
-python scripts/05_fire_and_forget.py --dry-run
-
-# Start remaining jobs on Apify, then exit (safe to close laptop)
-# Uses 1024MB/run + 90s stagger to stay under the ~16GB concurrent memory cap.
-# If Console still shows many RUNNING jobs, wait or abort them first.
-python scripts/05_fire_and_forget.py --min-items 10 --memory 1024 --stagger-seconds 90
-
-# Laptop-only sequential (safer on free-tier memory; keep PC awake)
-python scripts/01_scrape_apify.py --mode full --corpus both --engine trudax --searches-only --resume --workers 1 --timeout 1200
-
-# Later — download cloud datasets into data/raw/
-python scripts/02_download_datasets.py
-
-# Then filter + NLP as usual
-python scripts/03_filter_and_normalize.py
-python scripts/04_preprocess_nlp.py
-```
-
-Manifest of `run_id` / `dataset_id`: `data/raw/apify_fire_forget_manifest.json`
-
-## Cost note & pilot findings
-
-**Primary actor:** `labrat011/reddit-scraper` (~$1.50 / 1k results, HTTP/HTML, includes flair).  
-**Fallback:** `trudax/reddit-scraper-lite` (~$3.40 / 1k; Puppeteer; slower and more Reddit 403s).
-
-| Finding | Detail |
-|---------|--------|
-| Free tier cap | `labrat011` free plan ≈ **25 results per run** — need paid Apify / higher plan for 10k×2 |
-| Word-count yield | Pilot ≈ **70–75%** of posts had body &gt; 100 words (text posts) |
-| Flair | Available on labrat output (`Partner Loss`, `Mom Loss`, etc.) — sparse but useful |
-| No comments | `includeComments: false` / `skipComments: true` |
-
-Always run **pilot** first. Full oversample toward 10k clean posts per corpus will require **many runs** (multi-sort + search) and a paid Apify plan.
-
-### Optional: set API token for Python client
-
-```powershell
-$env:APIFY_TOKEN = "apify_api_..."   # from console.apify.com → Settings → Integrations
-```
-
-Without a token, the scraper falls back to `apify call` (uses your CLI login / keyring).
-
-## Pilot validation (completed)
-
-- Scraped sample from `r/GriefSupport` and `r/expats` via Apify CLI  
-- Filter pipeline produced interim parquets  
-- NLP pipeline produces `data/processed/corpus_{a,b}.parquet` with `text_clean` + `tokens`
-
-Scale to 10k/corpus after confirming Apify plan limits and budget.
+Reddit content is subject to Reddit’s terms and user privacy expectations. Use for research only; do not redistribute personal data without appropriate review. Apify usage is billed to your own account.

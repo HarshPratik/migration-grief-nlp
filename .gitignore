@@ -34,26 +34,30 @@ apify_token*
 config/local*.yaml
 config/*secret*
 
-# --- Phase briefs (author documents; not for public repo) ---
+# --- Phase briefs and agent-only notes ---
 phases/
+handoff.md
 
-# --- Local research data (Reddit IDs / text / large intermediates) ---
-# Code + configs ship; corpora and model caches stay local.
+# --- Local research data ---
+# Keep cleaned corpus CSVs; ignore raw dumps and heavy intermediates.
 data/raw/**
 !data/raw/.gitkeep
 data/interim/**
 !data/interim/.gitkeep
+
 data/processed/**
 !data/processed/.gitkeep
+!data/processed/corpus_a.csv
+!data/processed/corpus_b.csv
+
 data/analysis/**
 !data/analysis/.gitkeep
+!data/analysis/corpus_a.csv
+!data/analysis/corpus_b.csv
 
-# --- Generated outputs (tables/figures/bundles; rebuild locally) ---
+# --- Generated analysis artifacts (rebuildable) ---
 outputs/**
 !outputs/.gitkeep
-!outputs/tables/.gitkeep
-!outputs/figures/.gitkeep
-!outputs/summaries/.gitkeep
 
 # --- OS / editor ---
 .DS_Store
@@ -64,6 +68,6 @@ Desktop.ini
 *.swp
 *~
 
-# --- Notebooks checkpoints / local notes ---
+# --- Notebooks checkpoints ---
 notebooks/.ipynb_checkpoints/
 *.bak
