@@ -1,0 +1,13 @@
+{
+  "mode": "subreddit_posts",
+  "subreddits": ["GriefSupport", "expats"],
+  "sort": "new",
+  "timeFilter": "year",
+  "maxResults": 100,
+  "includeComments": false,
+  "includeNsfw": false,
+  "proxyConfiguration": {
+    "useApifyProxy": true,
+    "apifyProxyGroups": ["RESIDENTIAL"]
+  }
+}

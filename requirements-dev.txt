@@ -1,0 +1,5 @@
+# Test tooling for the shared analysis modules. See pytest.ini for the
+# deliberately scoped coverage target (the five shared modules only).
+
+pytest>=8,<9
+pytest-cov>=5,<8

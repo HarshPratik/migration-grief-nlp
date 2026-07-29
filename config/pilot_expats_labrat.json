@@ -1,0 +1,12 @@
+{
+  "mode": "subreddit_posts",
+  "subreddits": ["expats"],
+  "sort": "new",
+  "maxResults": 100,
+  "includeComments": false,
+  "includeNsfw": false,
+  "proxyConfiguration": {
+    "useApifyProxy": true,
+    "apifyProxyGroups": ["RESIDENTIAL"]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "startUrls": [
+    { "url": "https://www.reddit.com/r/expats/new/" },
+    { "url": "https://www.reddit.com/r/GriefSupport/new/" }
+  ],
+  "skipComments": true,
+  "skipCommunity": true,
+  "skipUserPosts": true,
+  "includeNSFW": false,
+  "includeMediaLinks": true,
+  "maxItems": 200,
+  "maxPostCount": 200,
+  "maxComments": 0,
+  "scrollTimeout": 60,
+  "postDateLimit": "2023-07-01",
+  "proxy": {
+    "useApifyProxy": true
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "searches": ["grief"],
+  "searchCommunityName": "GriefSupport",
+  "searchPosts": true,
+  "searchComments": false,
+  "skipComments": true,
+  "skipCommunity": true,
+  "sort": "new",
+  "time": "year",
+  "maxItems": 100,
+  "maxPostCount": 100,
+  "maxComments": 0,
+  "includeMediaLinks": true,
+  "proxy": {
+    "useApifyProxy": true
+  }
+}

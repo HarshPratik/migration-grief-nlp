@@ -1,0 +1,16 @@
+# Transformer layer. MANDATORY, not optional: phases/Phase 3.docx requires a
+# pre-trained emotion classification model (RoBERTa/DistilBERT), which has no
+# lightweight substitute -- VADER emits valence only, not emotion classes.
+#
+# Install torch FIRST, from the CPU index, as its own command:
+#   python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+#
+# Do NOT use --extra-index-url for the whole install: that lets pip pick from
+# either index and you can silently get the ~2.5 GB CUDA build. check_env.py
+# asserts torch.cuda.is_available() is False to catch that.
+#
+# Then, with constraints:
+#   python -m pip install -r requirements-analysis-torch.txt -c constraints-analysis.txt
+
+transformers>=4.44,<6
+sentence-transformers>=3.0,<6

@@ -1,0 +1,24 @@
+# Phases 2-4 analysis stack. Installs into .venv-analysis, NOT .venv.
+# Always install with -c constraints-analysis.txt.
+#
+# Deliberately absent:
+#   gensim        - pins numpy<2 and would break the spacy binary stack. Word2Vec
+#                   is indefensible at 28k/102k tokens anyway; PPMI+SVD via
+#                   scipy/sklearn replaces it and is deterministic.
+#   umap-learn    - requires numba, which pins numpy harder than gensim does.
+#   hdbscan       - dumps 30-60% of documents to noise at n~1010.
+#   bertopic      - depends on both of the above.
+#   seaborn       - reaches into pandas internals; pandas 3.0 raises the risk.
+#   nltk          - only wanted for VADER; vaderSentiment ships its own lexicon
+#                   with no nltk.download() step (a reproducibility liability).
+
+scipy>=1.16,<2
+scikit-learn>=1.7,<2
+matplotlib>=3.10,<4
+networkx>=3.4,<4
+vaderSentiment>=3.3.2,<4
+openpyxl>=3.1,<4
+
+# Predictive embeddings for empirical small-N evaluation (numpy 2 ok with gensim>=4.3)
+gensim>=4.3,<5
+

@@ -1,0 +1,69 @@
+# --- Python / tooling ---
+.venv/
+.venv-analysis/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+*.log
+
+# --- Secrets / credentials (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*secret*
+*credentials*
+id_rsa*
+id_ed25519*
+*.token
+apify_token*
+.secrets/
+config/local*.yaml
+config/*secret*
+
+# --- Phase briefs (author documents; not for public repo) ---
+phases/
+
+# --- Local research data (Reddit IDs / text / large intermediates) ---
+# Code + configs ship; corpora and model caches stay local.
+data/raw/**
+!data/raw/.gitkeep
+data/interim/**
+!data/interim/.gitkeep
+data/processed/**
+!data/processed/.gitkeep
+data/analysis/**
+!data/analysis/.gitkeep
+
+# --- Generated outputs (tables/figures/bundles; rebuild locally) ---
+outputs/**
+!outputs/.gitkeep
+!outputs/tables/.gitkeep
+!outputs/figures/.gitkeep
+!outputs/summaries/.gitkeep
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*~
+
+# --- Notebooks checkpoints / local notes ---
+notebooks/.ipynb_checkpoints/
+*.bak

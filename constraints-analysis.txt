@@ -1,0 +1,17 @@
+# Pin the Phase 1 binary stack so nothing in Phases 2-4 can silently downgrade it.
+#
+# Pass this with -c on EVERY install into .venv-analysis:
+#   python -m pip install -r requirements-analysis.txt -c constraints-analysis.txt
+#
+# Why: spacy/thinc/blis are compiled against the numpy 2.x ABI. Packages that
+# require numpy<2 (older gensim, numba/umap) would otherwise be resolved by pip
+# downgrading numpy. gensim>=4.3 is OK with numpy 2.5.1 (used for Word2Vec/
+# FastText empirical evaluation). numba/umap/hdbscan remain excluded.
+# With these constraints bad conflicts fail loudly at resolve time instead.
+
+numpy==2.5.1
+pandas==3.0.3
+pyarrow==25.0.0
+spacy==3.8.14
+thinc==8.3.13
+blis==1.3.3

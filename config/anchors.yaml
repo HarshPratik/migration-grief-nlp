@@ -1,0 +1,326 @@
+# Seed dictionaries - transcribed VERBATIM from phases/Seed Dictionary.docx.
+#
+# 71 anchors across 4 domains. Do not add, remove or reword an anchor without
+# the lead author's sign-off: the list is pre-registered and changing it after
+# seeing results is HARKing.
+#
+# `term` is the canonical token the pipeline collapses everything onto.
+# `surface_forms` are the strings actually matched in raw text (inflections and
+# spacing variants). 16 anchors are multi-word and carry `ngram: N` - these
+# CANNOT clear a frequency floor as separate tokens, so scripts/08 collapses
+# them to `term` before any counting happens.
+#
+# `tier` here is the EXPECTED tier only, recorded for reference. The observed
+# tier is computed from the data by scripts/09_anchor_coverage.py and always
+# wins. Measured on the recovered 906/687-post analysis corpora, 7 anchors reach
+# Tier 1, 7 reach Tier 2 and 57 fall to Tier 3. Reliability and frequency together
+# admit 12 anchors to semantic inference, so DOMAIN remains the primary unit.
+
+version: 1
+
+defaults:
+  match: surface          # surface | lemma | regex
+  case_sensitive: false
+  tier: rare
+
+domains:
+
+  temporal:
+    label: "Temporal & Spatial Disruption"
+    subtitle: "Umwelt / Time-Space Distortion"
+    color: "#4C78A8"
+    description: >-
+      To track how the perception of time, calendar events, and physical
+      distance are distorted.
+    anchors:
+      - term: timezone
+        surface_forms: ["timezone", "timezones", "time zone", "time zones"]
+      - term: weekend
+        surface_forms: ["weekend", "weekends"]
+      - term: sunday
+        surface_forms: ["sunday", "sundays"]
+      - term: friday
+        surface_forms: ["friday", "fridays"]
+      - term: morning
+        surface_forms: ["morning", "mornings"]
+        polysemous: true
+        notes: "Time of day vs mere time reference."
+      - term: night
+        surface_forms: ["night", "nights"]
+        polysemous: true
+        notes: "Time of day vs 'last night' as mere time reference."
+      - term: schedule
+        surface_forms: ["schedule", "schedules", "scheduled", "scheduling"]
+      - term: routine
+        surface_forms: ["routine", "routines"]
+      - term: calendar
+        surface_forms: ["calendar", "calendars"]
+      - term: distance
+        surface_forms: ["distance", "distances"]
+      - term: miles
+        surface_forms: ["miles", "mile"]
+      - term: away
+        surface_forms: ["away"]
+        polysemous: true
+        tier: high
+        notes: "Physical distance vs 'right away'/'pass away'."
+      - term: far
+        surface_forms: ["far"]
+        polysemous: true
+        tier: mid
+        notes: "Distance vs 'so far' (temporal/degree). Match whole word only - 'farm'/'fare' must not count."
+      - term: timezone_difference
+        surface_forms: ["timezone difference", "time zone difference", "timezone differences", "time difference"]
+        ngram: 2
+      - term: gap
+        surface_forms: ["gap", "gaps"]
+        polysemous: true
+        notes: "Time gap vs gap year vs literal gap."
+      - term: stuck
+        surface_forms: ["stuck"]
+        polysemous: true
+        tier: mid
+        notes: "Immobility vs 'stuck in traffic'/'stuck on a problem'."
+      - term: hours_behind
+        surface_forms: ["hours behind", "hour behind"]
+        ngram: 2
+      - term: hours_ahead
+        surface_forms: ["hours ahead", "hour ahead"]
+        ngram: 2
+      - term: empty_room
+        surface_forms: ["empty room", "empty rooms"]
+        ngram: 2
+
+  identity:
+    label: "Identity & The Symbolic Order"
+    subtitle: "Disruption of the Name/Self"
+    color: "#72B7B2"
+    description: >-
+      To capture the struggle of not fitting into the new symbolic space and the
+      distortion of one's signifiers.
+    anchors:
+      - term: name
+        surface_forms: ["name", "names"]
+        polysemous: true
+        notes: "Personal name vs 'name a thing'/'in the name of'. spaCy marks 'name' a stopword - protected in config/stopwords.yaml."
+      - term: pronounce
+        surface_forms: ["pronounce", "pronounced", "pronouncing", "pronunciation"]
+      - term: spell
+        surface_forms: ["spell", "spelled", "spelling", "spells"]
+        polysemous: true
+        notes: "Orthography vs 'a spell of time'/magic."
+      - term: accent
+        surface_forms: ["accent", "accents"]
+      - term: voice
+        surface_forms: ["voice", "voices"]
+        polysemous: true
+        notes: "Literal voice vs 'having a voice' (agency)."
+      - term: misunderstood
+        surface_forms: ["misunderstood", "misunderstand", "misunderstanding"]
+      - term: translate
+        surface_forms: ["translate", "translated", "translating", "translation"]
+        polysemous: true
+        notes: "Language translation vs 'translates into'."
+      - term: meaning
+        surface_forms: ["meaning", "meanings"]
+        polysemous: true
+        notes: "Semantic meaning vs life-meaning."
+      - term: foreigner
+        surface_forms: ["foreigner", "foreigners", "foreign"]
+      - term: outsider
+        surface_forms: ["outsider", "outsiders"]
+      - term: belong
+        surface_forms: ["belong", "belongs", "belonged", "belonging"]
+      - term: pretend
+        surface_forms: ["pretend", "pretends", "pretended", "pretending"]
+      - term: fit_in
+        surface_forms: ["fit in", "fitting in", "fits in", "fitted in"]
+        ngram: 2
+      - term: culture_shock
+        surface_forms: ["culture shock"]
+        ngram: 2
+      - term: identity
+        surface_forms: ["identity", "identities"]
+      - term: unrecognized
+        surface_forms: ["unrecognized", "unrecognised", "unrecognizable", "unrecognisable"]
+      - term: who_am_i
+        surface_forms: ["who am i"]
+        ngram: 3
+
+  absence:
+    label: "Existential Absence & Grief"
+    subtitle: "Dasein / Death-Awareness"
+    color: "#E45756"
+    description: >-
+      To extract narratives of feeling like a ghost, being left behind, or
+      witnessing life moving on without them.
+    anchors:
+      - term: ghost
+        surface_forms: ["ghost", "ghosts"]
+      - term: invisible
+        surface_forms: ["invisible"]
+      - term: forgotten
+        surface_forms: ["forgotten", "forget", "forgets", "forgetting", "forgot"]
+      - term: moving_on
+        surface_forms: ["moving on", "moved on", "moves on", "move on"]
+        ngram: 2
+      - term: without_me
+        surface_forms: ["without me"]
+        ngram: 2
+      - term: missing
+        surface_forms: ["missing"]
+        polysemous: true
+        tier: mid
+        notes: "Missing a person vs missing a train/deadline."
+      - term: gone
+        surface_forms: ["gone"]
+        polysemous: true
+        tier: mid
+        notes: "Death vs simple departure. Lemmatises to 'go', a spaCy stopword - protected in stopwords.yaml."
+      - term: alone
+        surface_forms: ["alone"]
+        tier: mid
+        notes: "spaCy stopword - protected. Reads f=0 in the Phase 1 tokens column."
+      - term: lost
+        surface_forms: ["lost"]
+        polysemous: true
+        tier: mid
+        notes: "Bereavement vs misplacement vs directionlessness. Needs sense filtering. Polysemous: bereavement vs misplacement vs directionlessness. Needs POS/sense filtering before interpretation."
+      - term: memory
+        surface_forms: ["memory", "memories"]
+        polysemous: true
+        notes: "Remembrance of a person vs cognitive memory/RAM."
+      - term: fade
+        surface_forms: ["fade", "fades", "faded", "fading"]
+        polysemous: true
+        notes: "Fading memory vs literal fading."
+      - term: empty
+        surface_forms: ["empty"]
+        polysemous: true
+        notes: "Emotional emptiness vs a literally empty container. spaCy stopword - protected in stopwords.yaml."
+      - term: replacing_me
+        surface_forms: ["replacing me", "replace me", "replaced me"]
+        ngram: 2
+      - term: life_goes_on
+        surface_forms: ["life goes on", "life went on"]
+        ngram: 3
+      - term: miss_out
+        surface_forms: ["miss out", "missing out", "missed out"]
+        ngram: 2
+      - term: funeral
+        surface_forms: ["funeral", "funerals"]
+      - term: passing_away
+        surface_forms: ["passing away", "passed away", "pass away", "passes away"]
+        ngram: 2
+      - term: loss
+        surface_forms: ["loss", "losses"]
+
+  digital:
+    label: "Digital Signifiers"
+    subtitle: "The Screen as the Last Anchor"
+    color: "#F58518"
+    description: >-
+      To observe how technology and screens mediate the remaining connection to
+      their original symbolic order.
+    anchors:
+      - term: skype
+        surface_forms: ["skype", "skyped", "skyping"]
+      - term: whatsapp
+        surface_forms: ["whatsapp", "whats app", "whatsap"]
+      - term: facetime
+        surface_forms: ["facetime", "face time", "facetimed", "facetiming"]
+      - term: screen
+        surface_forms: ["screen", "screens"]
+        polysemous: true
+        notes: "Includes 'home screen', 'screen board', and to-screen-a-candidate."
+      - term: pixel
+        surface_forms: ["pixel", "pixels", "pixelated"]
+      - term: lag
+        surface_forms: ["lag", "lagging", "lagged", "laggy"]
+        polysemous: true
+        notes: "Jet lag dominates in a migration corpus."
+      - term: delay
+        surface_forms: ["delay", "delays", "delayed"]
+        polysemous: true
+        notes: "In Corpus A this is flight delay and developmental delay, not network latency."
+      - term: connection
+        surface_forms: ["connection", "connections"]
+        polysemous: true
+        notes: >-
+          DOMINANT SENSE IS NOT DIGITAL. Concordance of Corpus A shows
+          interpersonal use ("a close connection", "my only moments of
+          connection"), not network connection. 67 hits in A - it is the single
+          largest contributor to the Digital domain total and inflates it.
+      - term: freeze
+        surface_forms: ["freeze", "freezes", "froze", "frozen", "freezing"]
+        polysemous: true
+        notes: "Cold weather and emotional freezing, not video freezing."
+      - term: wifi
+        surface_forms: ["wifi", "wi-fi", "wi fi"]
+      - term: signal
+        surface_forms: ["signal", "signals"]
+        polysemous: true
+        notes: "Usually 'a signal/sign', not reception."
+      - term: text_message
+        surface_forms: ["text message", "text messages", "text messaging"]
+        ngram: 2
+      - term: video_call
+        surface_forms: ["video call", "video calls", "video chat", "video called", "videocall"]
+        ngram: 2
+      - term: camera
+        surface_forms: ["camera", "cameras"]
+      - term: internet
+        surface_forms: ["internet"]
+      - term: screen_time
+        surface_forms: ["screen time", "screentime"]
+        ngram: 2
+      - term: disconnect
+        surface_forms: ["disconnect", "disconnected", "disconnects", "disconnection"]
+        polysemous: true
+        notes: "Often emotional ('felt disconnected from everyone'), not technical."
+
+# Cross-domain comparisons the author's Phase 2 brief implies ("Group 1 vs
+# Group 2"). Each is one test in family F1.
+comparisons:
+  - name: digital_vs_absence
+    left: digital
+    right: absence
+    hypothesis: >-
+      Digital-contact terms sit closer to absence/loss terms in Corpus A
+      (migration) than in Corpus B (grief).
+  - name: temporal_vs_absence
+    left: temporal
+    right: absence
+    hypothesis: >-
+      Temporal-disruption terms sit closer to absence terms in Corpus B than in
+      Corpus A.
+  - name: identity_vs_absence
+    left: identity
+    right: absence
+    hypothesis: >-
+      Identity-disruption terms sit closer to absence terms in Corpus A than in
+      Corpus B.
+  - name: digital_vs_temporal
+    left: digital
+    right: temporal
+    hypothesis: >-
+      Digital signifiers and temporal disruption co-organise more tightly in
+      migration narratives (timezone-mediated contact).
+
+# Never returned as a nearest neighbour: platform boilerplate that would
+# otherwise dominate lists in a Reddit corpus.
+neighbour_blocklist:
+  - reddit
+  - subreddit
+  - op
+  - edit
+  - tldr
+  - tl
+  - dr
+  - throwaway
+  - repost
+  - crosspost
+  - mod
+  - mods
+  - upvote
+  - downvote

@@ -1,0 +1,17 @@
+{
+  "startUrls": [
+    { "url": "https://www.reddit.com/r/GriefSupport/new/" }
+  ],
+  "skipComments": true,
+  "skipCommunity": true,
+  "skipUserPosts": true,
+  "includeNSFW": false,
+  "includeMediaLinks": false,
+  "maxItems": 50,
+  "maxPostCount": 50,
+  "maxComments": 0,
+  "postDateLimit": "2023-07-01",
+  "proxy": {
+    "useApifyProxy": true
+  }
+}

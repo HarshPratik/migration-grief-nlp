@@ -1,0 +1,179 @@
+# Knobs for Phases 2-4. Word lists live in anchors.yaml / stopwords.yaml so the
+# lead author can edit vocabulary without touching parameters.
+#
+# Every value here is read through scripts/analysis_config.py. No script may
+# hardcode a threshold.
+
+version: 1
+
+# Single source of randomness. Overridable per-run with --seed.
+seed: 20260726
+
+paths:
+  input_dir: "data/processed"      # Phase 1 output - FROZEN, never written to
+  analysis_dir: "data/analysis"    # Phase 2-4 intermediates, safe to delete
+  outputs_dir: "outputs"           # human-facing tables/figures/bundle
+
+preprocess:
+  min_token_len: 2
+  keep_pos: [NOUN, PROPN, VERB, ADJ, ADV]
+  lowercase_before_spacy: false    # Phase 1 did this; it damages cased models
+  strip_digits: false              # Phase 1 did this; it destroyed "2 years"
+  enable_senter: true              # Stage 4 clips windows at sentence boundaries
+  collapse_anchor_variants: true   # 16 multi-word anchors cannot survive otherwise
+
+# Frequency tiering. Applied to the MIN across corpora of BOTH token frequency
+# and document frequency: a comparison is limited by its weaker side, and 12
+# tokens spread over 10 posts is 10 independent observations, not 12.
+tiers:
+  tier1: { min_freq: 50, min_docfreq: 25 }   # full inference, enters FDR family
+  tier2: { min_freq: 20, min_docfreq: 10 }   # descriptive only, no p-values
+  # everything else is tier3: keyness + concordance only
+  fail_under_domain_coverage: 0.0            # gate on domain tier, not anchor %
+
+vectors:
+  # Default stays ppmi so run_analysis.py is unchanged. For small corpora,
+  # BERT/contextual is the recommended primary method (frozen encoder measures
+  # rather than estimates). Run the parallel package via:
+  #   python run_contextual_phase2.py
+  # which encodes once into data/analysis/vectors/contextual_cache/ and reuses
+  # cached token vectors for reliability + permutation/bootstrap (no re-encode).
+  backend: ppmi                    # ppmi | contextual | spacy
+  unit: domain                     # domain | anchor - domain is primary (only
+                                   # 7/71 anchors are individually analysable)
+  ppmi:
+    window: 5
+    min_count: 5
+    shift_k: 1
+    cds_smoothing: 1.0             # raw PPMI beat alpha=0.75 at every tested size
+    symmetric: true
+    use_svd: false                 # measured: raw PPMI > PPMI+SVD on this data
+    svd_dims: 200
+    shared_basis_min_freq: 20      # -> 213 shared context dimensions
+  contextual:
+    model_name: "bert-base-uncased"  # frozen; recommended for these corpus sizes
+    layers: [-1, -2, -3, -4]       # mean of last four hidden layers
+    batch_size: 16
+    max_seq_length: 256
+    all_but_the_top: 3             # Mu & Viswanath anisotropy correction; 0 = off
+  # Trained predictive embeddings — evaluated empirically via scripts/25_predictive_eval.py
+  # (not assumed a priori to fail). At small N, split-half reliability is the headline check.
+  predictive:
+    vector_size: 100
+    window: 5
+    min_count: 5
+    epochs: 20
+    sg: 1                          # 1 = skip-gram (SGNS), 0 = CBOW
+    negative: 5
+    workers: 1                     # single worker for determinism
+  spacy:
+    model: "en_core_web_md"
+
+neighbors:
+  top_k: 15                        # the author's Phase 2 brief asks for top-15
+  metric: cosine
+  exclude_self: true
+  min_neighbour_freq: 10           # shared-vocabulary pool floor
+  shared_vocab_only: true          # corpus-specific pools are not comparable
+
+reliability:
+  n_splits: 50                     # document-level split-halves
+  spearman_brown: true
+  min_reliability_for_inference: 0.25
+  chance_baseline: true            # always print 15/(2V-15) beside Jaccard
+
+windows:
+  size: 5                          # +/-5 tokens, per the brief
+  robustness_sizes: [3, 10]        # plus full-sentence
+  unit: token
+  clip_at_sentence: true
+  negation_rescue: 4               # extend left edge to catch a negator within N
+  max_per_anchor: 2000
+  dedupe_overlap: true
+
+emotion:
+  model: "j-hartmann/emotion-english-distilroberta-base"
+  robustness_model: "SamLowe/roberta-base-go_emotions"
+  batch_size: 32
+  store_probabilities: true        # keep full vectors, not just argmax
+  vader_check: true                # convergent valence check
+  # The author's Phase 3 brief names five states; this model emits seven.
+  label_map:
+    sadness: sadness
+    anger: anger
+    fear: fear
+    surprise: surprise
+    neutral: neutral
+    joy: joy                       # extra, reported separately
+    disgust: disgust               # extra, reported separately
+  author_labels: [sadness, anger, fear, surprise, neutral]
+
+stats:
+  n_permutations: 10000
+  n_bootstrap: 2000
+  resampling_unit: post            # never token - tokens within a post are dependent
+  author_cluster_policy: cap_one_per_author   # deterministic lowest post_id per author
+  stratify_by: word_count_decile   # neutralises the 1.84x length difference
+  exact_test: fixed_margin_monte_carlo_chi2
+  min_expected_cell: 5             # below this, chi-square is invalid -> exact test
+  fdr_q: 0.05
+  fdr_method: benjamini_hochberg
+  families: [F1_similarity, F2_emotion, F3_topics, F4_keyness]
+
+cooccurrence:
+  scope: window                    # window | sentence | doc
+  window: 5
+  min_count: 5                    # marginal vocabulary frequency floor
+  min_edge_count: 3               # pair support floor; prevents singleton PPMI edges
+  min_ppmi: 0.5
+  top_edges: 300
+  anchors_only: false
+  layout: spring
+  layout_seed: 7                   # unseeded spring_layout redraws differently every run
+  layout_iterations: 200
+
+topics:
+  method: nmf                      # nmf (deterministic w/ nndsvd) | lda
+  nmf_init: nndsvd
+  k: 12
+  k_sweep: [4, 6, 8, 10, 12, 15, 20]
+  stability_runs: 20               # Greene et al. term-centric stability
+  core_topic_threshold: 0.8        # interpret only topics recurring in >=80% of runs
+  scope: pooled                    # pooled - 323 docs cannot support a standalone model
+  max_features: 5000
+  min_df: 5
+  max_df: 0.5
+  top_terms: 15
+  max_iter: 500
+
+figures:
+  dpi: 300
+  formats: [png]
+  width_in: 8.0
+  height_in: 5.0
+  font_family: "DejaVu Sans"       # ships with matplotlib; no Windows font risk
+  base_font_size: 11
+  corpus_colors:
+    a: "#4C78A8"
+    b: "#E45756"
+  corpus_labels:
+    a: "Corpus A - Migration"
+    b: "Corpus B - Grief"
+  emotion_colors:
+    sadness: "#4C78A8"
+    fear: "#B279A2"
+    anger: "#E45756"
+    disgust: "#72B7B2"
+    surprise: "#F58518"
+    joy: "#54A24B"
+    neutral: "#BAB0AC"
+  heatmap_cmap: "viridis"
+  diverging_cmap: "RdBu_r"
+  annotate_max_cells: 400
+
+export:
+  csv: true
+  parquet: true
+  excel: true
+  float_decimals: 4
+  excel_max_rows: 50000            # windows table goes to CSV only

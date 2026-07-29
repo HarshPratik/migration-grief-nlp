@@ -1,0 +1,138 @@
+# Stopword policy for scripts/08_reprocess_tokens.py.
+#
+# WHY THIS FILE EXISTS
+# Phase 1 (scripts/04_preprocess_nlp.py:75) filtered on spaCy's `tok.is_stop`.
+# spaCy's default English list is 326 words and includes a lot of content-bearing
+# vocabulary. On this project it silently deleted most of the author's Absence
+# dictionary: `alone`, `empty`, `gone` (lemma "go"), `name`, plus the negators
+# `not`/`never`/`no`/`nothing`.
+#
+# Measured damage in the Phase 1 `tokens` column vs raw text (f_A / f_B):
+#   alone    0/0   in tokens  ->  41/182  in raw text
+#   gone     0/0              ->  23/287
+#   never    -                ->  81/721
+#   empty    0/1              ->  10/54
+#
+# Dropping negators is worse than losing frequency: it inverts meaning. With
+# `not` removed, "I do not miss home" and "I miss home" are the same string, so
+# any emotion or sentiment model scores them identically.
+#
+# The `protect` list below is published in the paper's methods section.
+
+version: 1
+
+# Base list to start from: spacy | none
+source: spacy
+
+# Never removed, even when spaCy marks them stopwords.
+protect:
+  # --- Negation and polarity. Removing these inverts sentence meaning. ---
+  - not
+  - "n't"
+  - "no"          # MUST stay quoted: YAML 1.1 parses bare `no` as boolean false
+  - never
+  - "none"
+  - nothing
+  - nobody
+  - nowhere
+  - neither
+  - nor
+  - cannot
+  - without
+
+  # --- Author's Absence dictionary (Dasein / death-awareness). ---
+  - alone
+  - empty
+  - gone
+  - go            # lemma of "gone"
+  - lost
+  - lose
+  - miss
+  - missing
+  - forget        # lemma of "forgotten"
+  - name          # Identity dictionary
+  - call          # Digital dictionary
+
+  # --- Temporal deixis. Core to the Temporal Disruption dictionary. ---
+  - still
+  - always
+  - already
+  - anymore
+  - yet
+  - now
+  - then
+  - again
+  - sometimes
+  - often
+  - once
+
+  # --- Relational and existential terms carrying content in these corpora. ---
+  - someone
+  - somebody
+  - something
+  - everything
+  - everyone
+  - anyone
+  - together
+  - back
+  - move
+  - side
+  - front
+  - full
+  - own
+  - last
+  - first
+  - least
+  - enough
+  - almost
+  - though
+  - across
+  - behind
+  - beside
+  - around
+
+# Removed in addition to spaCy's list: Reddit/forum boilerplate that would
+# otherwise surface as high-frequency "content".
+add:
+  - reddit
+  - subreddit
+  - op
+  - edit
+  - tldr
+  - tl
+  - dr
+  - throwaway
+  - repost
+  - crosspost
+  - upvote
+  - downvote
+  - mod
+  - mods
+  - x200b          # zero-width space artefact in Reddit exports
+  - amp            # residue of &amp; entity decoding
+  - nbsp
+  - gt
+  - lt
+  - deleted
+  - removed
+  - thanks
+  - thank
+  - please
+  - guys
+  - gonna
+  - wanna
+  - kinda
+  - sorta
+  - im
+  - ive
+  - dont
+  - doesnt
+  - didnt
+  - cant
+  - wont
+  - lol
+  - lmao
+  - edit2
+
+# spaCy stopwords to un-stop wholesale (beyond `protect`). Empty by default.
+remove: []

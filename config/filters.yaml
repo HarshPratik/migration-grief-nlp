@@ -1,0 +1,65 @@
+# Phase 1 filtering rules for Corpus A (migration) and Corpus B (grief)
+
+date_from: "2023-07-01"   # last ~3 years (relative to 2026-07)
+min_word_count: 100
+target_posts_per_corpus: 10000
+
+# Case-insensitive partial match on post flair (soft preference; missing flair is kept)
+include_flairs:
+  - vent
+  - personal story
+  - personal
+  - loss
+  - grief
+  - support
+  - story
+  - emotional support
+  - seeking support
+
+# Applied mainly to Corpus A (title + body). Drops paperwork/visa Q&A.
+exclude_keywords_corpus_a:
+  - visa
+  - green card
+  - i-485
+  - i-20
+  - tax
+  - taxes
+  - irs
+  - paperwork
+  - attorney fee
+  - h1b
+  - h-1b
+  - f1 status
+  - petition
+  - uscis
+  - permanent residency
+  - work permit
+  - ead
+
+# Optional soft ranking / Apify search seeds for long-form narrative posts
+include_keywords_boost:
+  corpus_a:
+    - homesick
+    - moved abroad
+    - leaving home
+    - culture shock
+    - miss my family
+    - living abroad
+    - expatriate life
+  corpus_b:
+    - grief
+    - bereavement
+    - passed away
+    - mourning
+    - lost my
+    - anniversary of
+    - can't stop crying
+
+subreddits:
+  corpus_a:
+    - expats
+    - immigration
+    - StudyAbroad
+  corpus_b:
+    - GriefSupport
+    - bereavement

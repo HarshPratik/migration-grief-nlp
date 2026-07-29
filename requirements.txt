@@ -1,0 +1,7 @@
+pandas>=2.0.0
+pyarrow>=14.0.0
+pyyaml>=6.0
+apify-client>=1.6.0
+spacy>=3.7.0
+click>=8.0
+tqdm>=4.66.0

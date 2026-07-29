@@ -1,0 +1,94 @@
+# Multi-run scrape plan for Apify ($52 budget account: lengthy_arrowroot)
+#
+# labrat011/reddit-scraper: reliable but free-tier hard-cap ~25 results/run
+# trudax/reddit-scraper-lite: pay-per-result (~$3.40/1k), search mode scales better
+#
+# Full mode uses BOTH: trudax search for volume + labrat listings as supplement.
+
+primary_actor_id: trudax/reddit-scraper-lite
+secondary_actor_id: labrat011/reddit-scraper
+
+# trudax common input
+trudax:
+  skipComments: true
+  skipCommunity: true
+  skipUserPosts: true
+  searchPosts: true
+  searchComments: false
+  searchCommunities: false
+  searchUsers: false
+  searchMedia: false
+  includeNSFW: false
+  includeMediaLinks: true
+  maxComments: 0
+  scrollTimeout: 60
+  proxy:
+    useApifyProxy: true
+    apifyProxyGroups:
+      - RESIDENTIAL
+
+# labrat common input
+labrat:
+  includeComments: false
+  includeNsfw: false
+  proxyConfiguration:
+    useApifyProxy: true
+    apifyProxyGroups:
+      - RESIDENTIAL
+
+pilot:
+  maxResults: 50
+  maxItems: 50
+  maxPostCount: 50
+
+full:
+  # Smaller batches finish before Reddit 403/timeouts; more runs → more unique posts
+  maxResults: 100
+  maxItems: 80
+  maxPostCount: 80
+
+# Listing sorts (labrat subreddit_posts + trudax startUrls)
+listing_sorts:
+  - new
+  - top
+  - hot
+
+time_filters_for_top:
+  - year
+  - month
+  - all
+
+# Broad search seeds — more queries = more unique posts under pagination caps
+search_queries:
+  corpus_a:
+    - homesick
+    - "moved abroad"
+    - "culture shock"
+    - "miss my family"
+    - "living abroad"
+    - "leaving home"
+    - "expat life"
+    - loneliness
+    - "I moved to"
+    - "new country"
+    - "miss my parents"
+    - "struggling abroad"
+    - "don't fit in"
+    - "feel isolated"
+    - "home sick"
+  corpus_b:
+    - grief
+    - bereavement
+    - "passed away"
+    - mourning
+    - "lost my"
+    - "lost my mom"
+    - "lost my dad"
+    - "lost my husband"
+    - "lost my wife"
+    - funeral
+    - "can't stop crying"
+    - "anniversary of"
+    - "one month since"
+    - "still hurts"
+    - "grief brain"
