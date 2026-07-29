@@ -20,8 +20,10 @@ config/           # filters, scrape plan, seed dictionary (anchors), analysis kn
 data/
   processed/      # Phase 1 cleaned corpus CSVs
   analysis/       # Corrected analysis corpus CSVs (primary research tables)
+docs/
+  figures/        # result figures embedded below
+  METHODS_RESULTS.md
 scripts/          # scrape → filter → analysis pipeline
-docs/             # methods notes and scraping ops tips
 tests/            # unit tests for shared analysis helpers
 run_analysis.py   # Phase 2–4 orchestration (PPMI default path)
 run_contextual_phase2.py   # frozen BERT path + methods join
@@ -47,7 +49,9 @@ Typical columns: `post_id`, `corpus`, `subreddit`, `title`, `body`, `text`, `cre
 
 ## Results so far (analysis corpus: A = 906, B = 687)
 
-All figures below are from the **current sample**, not the long-term target of ~10k posts per corpus. Scraping is paused; more data would require re-running analysis as a new sampling frame.
+All numbers and figures below are from the **current sample**, not the long-term target of ~10k posts per corpus. Scraping is paused; collecting more data would require re-running analysis as a new sampling frame.
+
+Figures are stored in [`docs/figures/`](docs/figures/) and rendered inline on GitHub.
 
 ### Project status
 
@@ -70,6 +74,14 @@ All figures below are from the **current sample**, not the long-term target of ~
 | **Absence** | alone, lost, gone, missing, ghost, funeral, … |
 | **Digital** | skype, screen, wifi, video call, connection, … |
 
+**Domain coverage** (share of posts hitting each domain; full dictionary vs strict/non-polysemous):
+
+![Domain coverage](docs/figures/p2_09_domain_coverage.png)
+
+Absence dominates grief posts (Corpus B); identity is denser in migration (Corpus A). Digital is the sparsest domain in both.
+
+---
+
 ### 1. Semantic similarity (Corpus A vs B)
 
 We compare how each domain is represented in migration vs grief posts.  
@@ -89,7 +101,37 @@ Significance uses post-level resampling and Benjamini–Hochberg FDR where appli
 - **BERT** (frozen `bert-base-uncased`) measures pretrained contextual senses. Domains are **mostly similar** across corpora (high cos\*), but still not interchangeable under a label-permutation null.
 - These are **complementary**, not contradictory.
 
-**Word2Vec & FastText (trained on these texts)** were also run with the same reliability design (not rejected without evidence):
+#### Domain profile geometry — PPMI
+
+Eight points = 4 domains × 2 corpora. Colours mark corpus membership.
+
+**PCA (PPMI context profiles)**
+
+![PPMI PCA](docs/figures/p2_18_domain_profiles_pca.png)
+
+**t-SNE (PPMI context profiles)**
+
+![PPMI t-SNE](docs/figures/p2_18_domain_profiles_tsne.png)
+
+#### Domain profile geometry — frozen BERT
+
+**PCA (BERT sense vectors)**
+
+![BERT PCA](docs/figures/p2_18_domain_profiles_pca__contextual.png)
+
+**t-SNE (BERT sense vectors)**
+
+![BERT t-SNE](docs/figures/p2_18_domain_profiles_tsne__contextual.png)
+
+#### Multi-method comparison (PPMI vs BERT cos\*)
+
+Points above the diagonal would mean BERT finds *more* cross-corpus similarity than PPMI (which is what we observe for every domain).
+
+![cos* PPMI vs BERT](docs/figures/p2_23_cosstar_ppmi_vs_contextual.png)
+
+#### Word2Vec and FastText (trained on these texts)
+
+Also evaluated with the same reliability design — not dismissed without a run:
 
 | Method | Domain profile reliability (mean A / B) | Neighbour-list Jaccard (mean A / B) | Domain cos\* (approx.) |
 |--------|------------------------------------------|-------------------------------------|-------------------------|
@@ -103,11 +145,13 @@ Chance neighbour Jaccard ≈ **0.014**.
 **Takeaway at this sample size**
 
 1. W2V/FT **domain profiles** are stable (high reliability).  
-2. Their **top-15 neighbour lists** are only modestly above chance and much less stable than BERT’s — so neighbour tables from W2V/FT are weak findings here.  
+2. Their **top-15 neighbour lists** are only modestly above chance and much less stable than BERT’s — neighbour tables from W2V/FT are weak findings here.  
 3. W2V/FT **cos\*** is near 1 (little A/B contrast). **PPMI** is most discriminative for collocates; **BERT** sits in between.  
-4. At ~10k posts/corpus, the same battery should be re-run before stronger claims about predictive embeddings.
+4. At ~10k posts/corpus, re-run the same battery before stronger claims about predictive embeddings.
 
 Usable individual anchors (frequency ≥ 20 in the weaker corpus **and** reliability gate): about **12/71** under PPMI and **8/71** under BERT. Prefer **domain-level** claims.
+
+---
 
 ### 2. Emotion around anchors (Phase 3)
 
@@ -123,12 +167,44 @@ Design: sentence-clipped ±5-token windows; one post per author for inference; p
 
 This is a **window proxy** for aspect-based emotion (emotion of local context; aspect ≈ anchor), not a trained ABSA model.
 
+**Stacked emotion mix by domain and corpus**
+
+![Emotion stacked by domain](docs/figures/p3_19_emotion_stacked_domain.png)
+
+**Emotion difference heatmap** (Corpus A − Corpus B; cells with “\*” survive multiple-testing correction)
+
+![Emotion difference heatmap](docs/figures/p3_19_emotion_difference_heatmap.png)
+
+Identity / Absence / Temporal show clear distributional shifts; Digital does not survive FDR.
+
+**Co-occurrence networks** (top 300 PPMI edges; exploratory — many edges have low raw counts)
+
+**Corpus A — migration**
+
+![Co-occurrence A](docs/figures/p3_20_cooccurrence__a.png)
+
+**Corpus B — grief**
+
+![Co-occurrence B](docs/figures/p3_20_cooccurrence__b.png)
+
+---
+
 ### 3. Topics (Phase 4)
 
 - Method: pooled **NMF** on both corpora, TF–IDF, bootstrap stability selection.  
 - Selected **k = 8**.  
 - Only **Topic 2** meets the high-stability “core” threshold (recurrence ≈ 0.95): study-abroad / university language, **higher loading in Corpus A**.  
 - Other topics (e.g. hospital/loss, homesick, job/move, family bereavement) appear but are **unstable** across restarts — report cautiously.
+
+**Topic prevalence by corpus** (★ marks the only core/stable topic)
+
+![Topic prevalence](docs/figures/p4_20_topic_prevalence.png)
+
+**Topic stability** across bootstrap runs (core threshold shown as a dashed line)
+
+![Topic stability](docs/figures/p4_20_topic_stability.png)
+
+---
 
 ### 4. What works vs what is weak
 
@@ -140,8 +216,24 @@ This is a **window proxy** for aspect-based emotion (emotion of local context; a
 | Explicit multi-method evaluation of W2V/FT | W2V/FT neighbours not trustworthy at this N |
 | Stability-selected topics (honest core count) | Only one core topic |
 
-Longer write-up of methods and tables: [`docs/METHODS_RESULTS.md`](docs/METHODS_RESULTS.md).  
-Full numeric exports (when regenerated locally): `outputs/tables/`, `outputs/figures/`.
+### Figure index
+
+| Figure | Path |
+|--------|------|
+| Domain coverage | [`docs/figures/p2_09_domain_coverage.png`](docs/figures/p2_09_domain_coverage.png) |
+| PPMI domain PCA | [`docs/figures/p2_18_domain_profiles_pca.png`](docs/figures/p2_18_domain_profiles_pca.png) |
+| PPMI domain t-SNE | [`docs/figures/p2_18_domain_profiles_tsne.png`](docs/figures/p2_18_domain_profiles_tsne.png) |
+| BERT domain PCA | [`docs/figures/p2_18_domain_profiles_pca__contextual.png`](docs/figures/p2_18_domain_profiles_pca__contextual.png) |
+| BERT domain t-SNE | [`docs/figures/p2_18_domain_profiles_tsne__contextual.png`](docs/figures/p2_18_domain_profiles_tsne__contextual.png) |
+| cos\* PPMI vs BERT | [`docs/figures/p2_23_cosstar_ppmi_vs_contextual.png`](docs/figures/p2_23_cosstar_ppmi_vs_contextual.png) |
+| Emotion stacked bars | [`docs/figures/p3_19_emotion_stacked_domain.png`](docs/figures/p3_19_emotion_stacked_domain.png) |
+| Emotion difference heatmap | [`docs/figures/p3_19_emotion_difference_heatmap.png`](docs/figures/p3_19_emotion_difference_heatmap.png) |
+| Co-occurrence A / B | [`p3_20_cooccurrence__a.png`](docs/figures/p3_20_cooccurrence__a.png), [`p3_20_cooccurrence__b.png`](docs/figures/p3_20_cooccurrence__b.png) |
+| Topic prevalence | [`docs/figures/p4_20_topic_prevalence.png`](docs/figures/p4_20_topic_prevalence.png) |
+| Topic stability | [`docs/figures/p4_20_topic_stability.png`](docs/figures/p4_20_topic_stability.png) |
+
+Longer methods write-up: [`docs/METHODS_RESULTS.md`](docs/METHODS_RESULTS.md).  
+Full numeric tables regenerate under `outputs/tables/` when you re-run the pipeline locally.
 
 ---
 
@@ -226,8 +318,8 @@ Seed dictionary: **4 domains / 71 anchors** in `config/anchors.yaml`
 .\.venv-analysis\Scripts\python.exe run_predictive_phase2.py
 ```
 
-Results land under `outputs/tables/`, `outputs/figures/`, `outputs/summaries/` (local; not committed by default).  
-Methods summary: `docs/METHODS_RESULTS.md`.
+Regenerated tables/figures also appear under `outputs/` locally.  
+Published copies of the main figures are kept in `docs/figures/` for the README.
 
 ### Method overview
 
