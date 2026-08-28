@@ -37,6 +37,16 @@ config/*secret*
 # --- Phase briefs and agent-only notes ---
 phases/
 handoff.md
+**/handoff.md
+review.md
+**/review.md
+docs/HOME_RESUME.md
+docs/SPEED.md
+scripts/_*.py
+scripts/27_balanced_efficient_scrape.py
+scripts/28_fire_wave2.py
+scripts/29_download_wave_manifest.py
+scripts/30_burn_balance.py
 
 # --- Local research data ---
 # Keep cleaned corpus CSVs; ignore raw dumps and heavy intermediates.
@@ -49,11 +59,17 @@ data/processed/**
 !data/processed/.gitkeep
 !data/processed/corpus_a.csv
 !data/processed/corpus_b.csv
+!data/processed/PHASE1_COMPLETE.md
 
 data/analysis/**
 !data/analysis/.gitkeep
 !data/analysis/corpus_a.csv
 !data/analysis/corpus_b.csv
+
+# --- Manual annotation pack (contains post excerpts) ---
+annotation/*.xlsx
+annotation/*.html
+annotation/*coded*
 
 # --- Generated analysis artifacts (rebuildable) ---
 # Full outputs/ stays local; publication figures are mirrored under docs/figures/

@@ -17,8 +17,10 @@ Example:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -55,6 +57,136 @@ _be = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_be)
 
 CORPORA = ("a", "b")
+
+# ---------------------------------------------------------------------------
+# Parallel training pool.
+#
+# The ~200 gensim trainings per algorithm are the bottleneck and are
+# independent given their document subsets. Each training keeps workers=1
+# and its fixed seed, so results are bit-identical to the sequential version;
+# parallelism is ONLY across models. Corpora are handed to each worker once
+# via the pool initializer; job payloads carry index lists instead of data.
+# ---------------------------------------------------------------------------
+_WORKER_STATE: dict = {}
+
+
+def _init_worker(docs_a, docs_b, extra_terms):
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
+    _WORKER_STATE["a"] = docs_a
+    _WORKER_STATE["b"] = docs_b
+    _WORKER_STATE["extra_terms"] = list(extra_terms)
+
+
+class ArrayKeyedVectors:
+    """Minimal wv replacement rebuilt from plain arrays (pickle-safe, exact).
+
+    Supports the operations used downstream: ``in``, ``len``, ``[token]``,
+    ``get_vector`` and ``index_to_key``. ``extra`` holds vectors synthesised
+    for out-of-vocabulary target terms (FastText subwords), matching what
+    ``target_vector`` would obtain from the live model.
+    """
+
+    __slots__ = ("_words", "_matrix", "_index", "_extra")
+
+    def __init__(self, words, matrix, extra=None):
+        self._words = list(words)
+        self._matrix = np.asarray(matrix)
+        self._index = {w: i for i, w in enumerate(self._words)}
+        self._extra = dict(extra or {})
+
+    def __contains__(self, key):
+        return key in self._index or key in self._extra
+
+    def __len__(self):
+        return len(self._words)
+
+    def __getitem__(self, key):
+        return self.get_vector(key)
+
+    def get_vector(self, key):
+        idx = self._index.get(key)
+        if idx is not None:
+            return self._matrix[idx]
+        vec = self._extra.get(key)
+        if vec is None:
+            raise KeyError(key)
+        return vec
+
+    @property
+    def index_to_key(self):
+        return self._words
+
+    @property
+    def vectors(self):
+        return self._matrix
+
+
+def _train_worker(payload):
+    tag, source, indices, algorithm, params = payload
+    if source == "a":
+        corpus = _WORKER_STATE["a"]
+    elif source == "b":
+        corpus = _WORKER_STATE["b"]
+    else:
+        corpus = _WORKER_STATE["a"] + _WORKER_STATE["b"]
+    docs = list(corpus) if indices is None else [corpus[int(i)] for i in indices]
+    try:
+        kv = train_keyed_vectors(docs, algorithm=algorithm, **params)
+    except ValueError:
+        return tag, None
+    words = list(kv.index_to_key)
+    matrix = (
+        np.stack([np.asarray(kv.get_vector(w), dtype=np.float32) for w in words])
+        if words
+        else np.zeros((0, params.get("vector_size", 100)), np.float32)
+    )
+    extra = {}
+    for term in _WORKER_STATE["extra_terms"]:
+        if term not in kv:
+            try:
+                extra[term] = np.asarray(kv.get_vector(term), dtype=np.float32)
+            except KeyError:
+                continue
+    return tag, (words, matrix, extra)
+
+
+def _reconstruct_kv(data):
+    if data is None:
+        return None
+    words, matrix, extra = data
+    return ArrayKeyedVectors(words, matrix, extra)
+
+
+def run_trainings(jobs, max_workers: int, desc: str) -> dict:
+    """Run independent trainings; returns {tag: ArrayKeyedVectors | None}."""
+    total = len(jobs)
+    results: dict = {}
+    if max_workers <= 1 or total <= 1:
+        for payload in jobs:
+            tag, data = _train_worker(payload)
+            results[tag] = _reconstruct_kv(data)
+        return results
+    item(f"dispatching {total} {desc} trainings to {max_workers} workers", indent=1)
+    done = 0
+    with ProcessPoolExecutor(
+        max_workers=max_workers,
+        initializer=_init_worker,
+        initargs=(
+            _WORKER_STATE["a"],
+            _WORKER_STATE["b"],
+            _WORKER_STATE["extra_terms"],
+        ),
+    ) as pool:
+        futures = [pool.submit(_train_worker, payload) for payload in jobs]
+        for future in as_completed(futures):
+            tag, data = future.result()
+            results[tag] = _reconstruct_kv(data)
+            done += 1
+            if done % 10 == 0 or done == total:
+                item(f"trained {done}/{total} {desc}", indent=2)
+    return results
 
 
 def benjamini_hochberg(p_values: np.ndarray) -> np.ndarray:
@@ -104,6 +236,13 @@ def main() -> int:
     parser.add_argument("--top-k", type=int, default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--no-gate", action="store_true")
+    parser.add_argument(
+        "--train-workers",
+        type=int,
+        default=max(2, min(12, (os.cpu_count() or 4) - 4)),
+        help="parallel training processes; each training itself keeps workers=1 "
+        "so results are identical to sequential execution",
+    )
     args = parser.parse_args()
 
     cfg = load_analysis_config(seed=args.seed)
@@ -122,12 +261,22 @@ def main() -> int:
     chance = jaccard_chance(top_k, len(basis))
     rng = make_rng(cfg.seed)
 
+    # Hand corpora + all OOV-synthesis target terms to the training pool.
+    _WORKER_STATE["a"] = documents["a"]
+    _WORKER_STATE["b"] = documents["b"]
+    _extra_terms: set[str] = set()
+    for _u in units:
+        for _terms in _be.build_targets(anchors, _u).values():
+            _extra_terms.update(str(t) for t in _terms)
+    _WORKER_STATE["extra_terms"] = sorted(_extra_terms)
+
     banner("Predictive embedding evaluation (empirical small-N check)")
     item(f"algorithms     {args.algorithms}")
     item(f"basis size     {len(basis)}")
     item(f"vector_size    {params['vector_size']}  window={params['window']}  "
          f"min_count={params['min_count']}  epochs={params['epochs']}  sg={params['sg']}")
     item(f"splits={args.n_splits}  bootstrap={args.n_bootstrap}  permutations={args.n_permutations}")
+    item(f"train workers  {args.train_workers} (each training single-threaded, seeds fixed)")
     item(f"Jaccard chance {chance:.4f}")
 
     vectors_dir = analysis_dir / "vectors"
@@ -147,13 +296,17 @@ def main() -> int:
         }
 
         # ---- full-corpus models (saved for inspection) --------------------
-        full_kv = {}
+        trained_full = run_trainings(
+            [
+                ("full_a", "a", None, algorithm, params),
+                ("full_b", "b", None, algorithm, params),
+            ],
+            args.train_workers,
+            f"full {algorithm}",
+        )
+        full_kv = {"a": trained_full["full_a"], "b": trained_full["full_b"]}
         for label in CORPORA:
-            item(f"training full {algorithm} on corpus {label} (n={len(documents[label])})")
-            full_kv[label] = train_keyed_vectors(
-                documents[label], algorithm=algorithm, **params
-            )
-            item(f"  vocab size: {len(full_kv[label])}", indent=2)
+            item(f"full {algorithm} corpus {label}: vocab {len(full_kv[label])}", indent=1)
 
         # ---- reliability via split-half RE-TRAIN --------------------------
         all_rel_rows: list[dict] = []
@@ -169,25 +322,33 @@ def main() -> int:
                 c: {n: [] for n in names} for c in CORPORA
             }
 
+            jobs = []
             for label in CORPORA:
-                docs = documents[label]
-                n_docs = len(docs)
+                n_docs = len(documents[label])
                 for split_i in range(args.n_splits):
                     order = rng.permutation(n_docs)
                     mid = n_docs // 2
-                    first = [docs[i] for i in order[:mid]]
-                    second = [docs[i] for i in order[mid:]]
                     # Distinct seeds per split so runs are not identical.
                     seed_l = int(cfg.seed + split_i * 2 + (0 if label == "a" else 1000))
                     seed_r = seed_l + 1
-                    try:
-                        kv_l = train_keyed_vectors(
-                            first, algorithm=algorithm, **{**params, "seed": seed_l}
-                        )
-                        kv_r = train_keyed_vectors(
-                            second, algorithm=algorithm, **{**params, "seed": seed_r}
-                        )
-                    except ValueError:
+                    jobs.append((
+                        (label, split_i, "l"), label, order[:mid],
+                        algorithm, {**params, "seed": seed_l},
+                    ))
+                    jobs.append((
+                        (label, split_i, "r"), label, order[mid:],
+                        algorithm, {**params, "seed": seed_r},
+                    ))
+
+            trained = run_trainings(
+                jobs, args.train_workers, f"{algorithm} split-half {unit}"
+            )
+
+            for label in CORPORA:
+                for split_i in range(args.n_splits):
+                    kv_l = trained.get((label, split_i, "l"))
+                    kv_r = trained.get((label, split_i, "r"))
+                    if kv_l is None or kv_r is None:
                         continue
 
                     for name in names:
@@ -311,21 +472,25 @@ def main() -> int:
                 boot_cosines[(unit, name)] = []
                 perm_cosines[(unit, name)] = []
 
+        boot_jobs = []
         for b_i in range(args.n_bootstrap):
             ia = rng.integers(0, len(documents["a"]), len(documents["a"]))
             ib = rng.integers(0, len(documents["b"]), len(documents["b"]))
-            docs_a = [documents["a"][i] for i in ia]
-            docs_b = [documents["b"][i] for i in ib]
-            try:
-                kv_a = train_keyed_vectors(
-                    docs_a, algorithm=algorithm,
-                    **{**params, "seed": int(cfg.seed + 10_000 + b_i)},
-                )
-                kv_b = train_keyed_vectors(
-                    docs_b, algorithm=algorithm,
-                    **{**params, "seed": int(cfg.seed + 20_000 + b_i)},
-                )
-            except ValueError:
+            boot_jobs.append((
+                ("boot", b_i, "a"), "a", ia,
+                algorithm, {**params, "seed": int(cfg.seed + 10_000 + b_i)},
+            ))
+            boot_jobs.append((
+                ("boot", b_i, "b"), "b", ib,
+                algorithm, {**params, "seed": int(cfg.seed + 20_000 + b_i)},
+            ))
+        boot_trained = run_trainings(
+            boot_jobs, args.train_workers, f"{algorithm} bootstrap"
+        )
+        for b_i in range(args.n_bootstrap):
+            kv_a = boot_trained.get(("boot", b_i, "a"))
+            kv_b = boot_trained.get(("boot", b_i, "b"))
+            if kv_a is None or kv_b is None:
                 continue
             for unit, targets in unit_targets.items():
                 pa = profiles_for_targets(kv_a, targets, basis)
@@ -352,6 +517,7 @@ def main() -> int:
             )
         deciles = pd.qcut(lengths, 10, labels=False, duplicates="drop")
 
+        perm_jobs = []
         for p_i in range(args.n_permutations):
             mask = np.zeros(len(pooled), dtype=bool)
             for stratum in np.unique(deciles):
@@ -359,18 +525,21 @@ def main() -> int:
                 k = int(round(len(idx) * n_a / len(pooled)))
                 chosen = rng.choice(idx, size=min(k, len(idx)), replace=False)
                 mask[chosen] = True
-            docs_pa = [pooled[i] for i in range(len(pooled)) if mask[i]]
-            docs_pb = [pooled[i] for i in range(len(pooled)) if not mask[i]]
-            try:
-                kv_pa = train_keyed_vectors(
-                    docs_pa, algorithm=algorithm,
-                    **{**params, "seed": int(cfg.seed + 30_000 + p_i)},
-                )
-                kv_pb = train_keyed_vectors(
-                    docs_pb, algorithm=algorithm,
-                    **{**params, "seed": int(cfg.seed + 40_000 + p_i)},
-                )
-            except ValueError:
+            perm_jobs.append((
+                ("perm", p_i, "a"), "pooled", np.flatnonzero(mask),
+                algorithm, {**params, "seed": int(cfg.seed + 30_000 + p_i)},
+            ))
+            perm_jobs.append((
+                ("perm", p_i, "b"), "pooled", np.flatnonzero(~mask),
+                algorithm, {**params, "seed": int(cfg.seed + 40_000 + p_i)},
+            ))
+        perm_trained = run_trainings(
+            perm_jobs, args.train_workers, f"{algorithm} permutation"
+        )
+        for p_i in range(args.n_permutations):
+            kv_pa = perm_trained.get(("perm", p_i, "a"))
+            kv_pb = perm_trained.get(("perm", p_i, "b"))
+            if kv_pa is None or kv_pb is None:
                 continue
             for unit, targets in unit_targets.items():
                 pa = profiles_for_targets(kv_pa, targets, basis)

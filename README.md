@@ -9,7 +9,62 @@ Comparative NLP study of two Reddit post corpora:
 
 Posts only (no comments), longer than 100 words, roughly the last three years from mid-2023, with soft flair preference. Corpus A drops visa/tax/paperwork Q&A via keyword filters.
 
-The project supports data collection (Apify), cleaning, and Phases 2–4 analysis: semantic comparison (PPMI, BERT, Word2Vec, FastText), emotion windows, co-occurrence networks, and topic modeling.
+Collection is Arctic Shift (no Apify on the current 10k rebuild). Analysis covers Phases 2–4: semantic comparison (PPMI, BERT, Word2Vec, FastText), emotion windows, co-occurrence networks, and topic modeling.
+
+---
+
+## Status
+
+| | |
+|--|--|
+| **Ready for** | Drafting the research paper from the 10k / 10k results below |
+| **Not finished** | Human coding of 150 emotion windows; the paper text itself |
+| **Repo** | Private. Row-level CSVs contain Reddit post text — do not make public without ethics review |
+
+### Done
+
+- Phase 1 sample: **10,000** migration posts and **10,000** grief posts (`2023-07-01` ≤ date `< 2026-08-24`, body > 100 words, quotas + flair-first). Audit: [`data/processed/PHASE1_COMPLETE.md`](data/processed/PHASE1_COMPLETE.md).
+- Seed dictionary: 4 domains, 71 anchors (`config/anchors.yaml`).
+- Phase 2: PPMI, frozen BERT, Word2Vec, FastText, reliability gates, top-15 neighbours, PCA/t-SNE.
+- Phase 3: DistilRoBERTa-emotion on ±5-token windows (ABSA **proxy**, not a trained aspect model). All four domains differ after FDR (q = 0.0003).
+- Phase 4: pooled NMF, **k = 12**, 11/12 core topics.
+- Publication figures in [`docs/figures/`](docs/figures/). Longer write-up: [`docs/METHODS_RESULTS.md`](docs/METHODS_RESULTS.md).
+
+### Left to do
+
+1. **Code 150 emotion windows (human).** This is the remaining validation for Phase 3.  
+   Local pack (not in git — it contains post excerpts):
+   - Excel: `annotation/emotion_windows_150.xlsx` — sheet **CODE HERE**, yellow columns.  
+   - Or browser: `annotation/emotion_windows_150.html`.  
+   Rebuild the pack after a fresh sample: `python scripts/22_annotation_sample.py --replace` then `python scripts/32_make_annotation_workbook.py` (needs `openpyxl`).  
+   Do **not** open the “MODEL GUESSES” sheet until all 150 rows are coded.
+2. **Write the paper** using the results in this README and `docs/METHODS_RESULTS.md`. Prefer **domain-level** claims. Declared domain-pair hypotheses mostly fail or split by method — report that honestly.
+3. Optional: after coding, score agreement with the model labels (kept off the coding sheet on purpose).
+
+### How to reproduce the computational results
+
+```powershell
+python -m venv .venv-analysis
+.\.venv-analysis\Scripts\python.exe -m pip install -U pip
+.\.venv-analysis\Scripts\python.exe -m pip install -r requirements.txt -r requirements-analysis.txt -c constraints-analysis.txt
+.\.venv-analysis\Scripts\python.exe -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+.\.venv-analysis\Scripts\python.exe -m pip install -r requirements-analysis-torch.txt -c constraints-analysis.txt
+.\.venv-analysis\Scripts\python.exe -m spacy download en_core_web_sm
+.\.venv-analysis\Scripts\python.exe -m spacy download en_core_web_md
+.\.venv-analysis\Scripts\python.exe run_analysis.py
+.\.venv-analysis\Scripts\python.exe run_contextual_phase2.py
+.\.venv-analysis\Scripts\python.exe run_predictive_phase2.py
+.\.venv-analysis\Scripts\python.exe -m pytest
+```
+
+Collection (only if rebuilding the raw archive, not required to analyse the CSVs already in this repo):
+
+```powershell
+python scripts/31_scrape_arctic_shift.py
+python scripts/03_filter_and_normalize.py
+python scripts/04_preprocess_nlp.py
+python scripts/08_reprocess_tokens.py
+```
 
 ---
 
@@ -32,14 +87,13 @@ run_predictive_phase2.py   # Word2Vec / FastText evaluation
 
 ### Included data
 
-| File | Rows (approx.) | Role |
-|------|----------------|------|
-| `data/analysis/corpus_a.csv` | 906 | **Primary** migration corpus for Phases 2–4 |
-| `data/analysis/corpus_b.csv` | 687 | **Primary** grief corpus for Phases 2–4 |
-| `data/processed/corpus_a.csv` | 323 | Earlier Phase 1 freeze (pre-filter recovery) |
-| `data/processed/corpus_b.csv` | 687 | Phase 1 grief corpus |
+| File | Rows | Role |
+|------|-----:|------|
+| `data/analysis/corpus_a.csv` | 10,000 | **Primary** migration corpus for Phases 2–4 |
+| `data/analysis/corpus_b.csv` | 10,000 | **Primary** grief corpus for Phases 2–4 |
+| `data/processed/PHASE1_COMPLETE.md` | — | Sampling-frame audit for the 2026-08-27 rebuild |
 
-Prefer **`data/analysis/`** for new analysis. The analysis corpus recovers posts that an over-broad keyword filter had dropped from Corpus A (substring false positives). Raw Apify dumps and large intermediates are not in git (regenerate or restore locally).
+Prefer **`data/analysis/`** for new analysis. Collection is Arctic Shift plus already-downloaded dumps (no Apify in this rebuild). Raw dumps and large intermediates are not in git.
 
 Typical columns: `post_id`, `corpus`, `subreddit`, `title`, `body`, `text`, `created_at`, `url`, `flair`, `score`, `word_count`, `username`, plus cleaned/token fields depending on stage.
 
@@ -47,23 +101,11 @@ Typical columns: `post_id`, `corpus`, `subreddit`, `title`, `body`, `text`, `cre
 
 ---
 
-## Results so far (analysis corpus: A = 906, B = 687)
+## Results so far (analysis corpus: A = 10,000, B = 10,000)
 
-All numbers and figures below are from the **current sample**, not the long-term target of ~10k posts per corpus. Scraping is paused; collecting more data would require re-running analysis as a new sampling frame.
+Rebuild of 2026-08-27. Date window `2023-07-01 ≤ created_at < 2026-08-24`. Sampling seed `20260827`. Corpus A: expats 3,889 / StudyAbroad 3,240 / immigration 2,871. Corpus B: GriefSupport 9,752 / bereavement 248.
 
 Figures are stored in [`docs/figures/`](docs/figures/) and rendered inline on GitHub.
-
-### Project status
-
-| Stage | Status | Notes |
-|-------|--------|--------|
-| Data collection | Partial | Clean analysis CSVs in repo; volume far below 10k×2 target |
-| Seed dictionary | Done | 4 domains, 71 anchors (`config/anchors.yaml`) |
-| Semantic comparison (Phase 2) | Done | PPMI, frozen BERT, Word2Vec, FastText |
-| Emotion windows (Phase 3) | Done | DistilRoBERTa-emotion; ABSA-style **proxy** (not trained ABSA) |
-| Co-occurrence networks | Done | PPMI-weighted graphs (exploratory) |
-| Topic model (Phase 4) | Done | Pooled NMF, k = 8 by stability |
-| Manual emotion annotation | Template only | 150-window sample prepared; coding not finished |
 
 ### Seed domains
 
@@ -90,16 +132,16 @@ Significance uses post-level resampling and Benjamini–Hochberg FDR where appli
 
 | Domain | PPMI cos\* | PPMI different A vs B? | BERT cos\* | BERT residual difference? |
 |--------|------------:|:----------------------:|------------:|:-------------------------:|
-| Temporal | 0.72 | **Yes** (q ≈ 0.003) | 0.91 | Yes (q = 0.002) |
-| Absence | 0.60 | **Yes** (q ≈ 0.003) | 0.91 | Yes (q = 0.002) |
-| Identity | 0.58 | **Yes** (q ≈ 0.003) | 0.82 | Yes (q = 0.002) |
-| Digital | 0.80 | No (q ≈ 0.08) | 0.96 | Yes (q = 0.002) |
+| Temporal | 0.71 | **Yes** (q = 0.0001) | 0.92 | Yes (q = 0.002) |
+| Absence | 0.67 | **Yes** (q = 0.0001) | 0.93 | Yes (q = 0.002) |
+| Identity | 0.70 | **Yes** (q = 0.0001) | 0.86 | Yes (q = 0.002) |
+| Digital | 0.71 | **Yes** (q = 0.0001) | 0.97 | Yes (q = 0.002) |
 
 **How to read this**
 
-- **PPMI** measures collocational overlap (local co-occurrence profiles). Migration and grief **diverge** clearly for Temporal, Absence, and Identity; Digital is borderline.
+- **PPMI** measures collocational overlap (local co-occurrence profiles). All four domains now **diverge** after FDR (q = 0.0001); Digital is no longer the exception it was on the 906/687 sample.
 - **BERT** (frozen `bert-base-uncased`) measures pretrained contextual senses. Domains are **mostly similar** across corpora (high cos\*), but still not interchangeable under a label-permutation null.
-- These are **complementary**, not contradictory.
+- These are **complementary**, not contradictory. Shared basis size is **2,286** types.
 
 #### Domain profile geometry — PPMI
 
@@ -131,25 +173,22 @@ Points above the diagonal would mean BERT finds *more* cross-corpus similarity t
 
 #### Word2Vec and FastText (trained on these texts)
 
-Also evaluated with the same reliability design — not dismissed without a run:
+Full 10k/10k evaluation is **done** (12 splits / 20 bootstrap / 30 permutations). Parallel trainer identity vs sequential was verified on a 2/2/2 smoke.
 
-| Method | Domain profile reliability (mean A / B) | Neighbour-list Jaccard (mean A / B) | Domain cos\* (approx.) |
-|--------|------------------------------------------|-------------------------------------|-------------------------|
-| BERT | 0.99 / 0.98 | **0.53 / 0.48** | 0.82–0.96 |
-| FastText | 1.00 / 1.00 | 0.11 / 0.09 | ~0.98–0.99 |
-| Word2Vec | 0.99 / 0.99 | 0.12 / 0.06 | ~0.98–0.99 |
-| PPMI | 0.50 / 0.53 | 0.06 / 0.05 | 0.58–0.80 |
+| Method | Domain profile reliability (mean A / B) | Neighbour Jaccard (mean A / B) | Domain cos\* |
+|--------|------------------------------------------|--------------------------------|--------------|
+| BERT | 0.999 / 0.999 | **0.60 / 0.75** | 0.86–0.97 |
+| FastText | 0.992 / 0.990 | 0.17 / 0.36 | 0.97–0.98 |
+| Word2Vec | 0.988 / 0.986 | 0.13 / 0.29 | 0.96–0.98 |
+| PPMI | 0.55 / 0.58 | 0.04 / 0.05 | 0.67–0.71 |
 
-Chance neighbour Jaccard ≈ **0.014**.
+Chance neighbour Jaccard ≈ **0.0033** (basis = 2,286). Usable individual anchors (frequency ≥ 20 in the weaker corpus **and** reliability gate): **29/71** PPMI, **40/71** BERT, **48/71** Word2Vec, **48/71** FastText. Prefer **domain-level** claims.
 
-**Takeaway at this sample size**
+**Takeaway at 10k**
 
-1. W2V/FT **domain profiles** are stable (high reliability).  
-2. Their **top-15 neighbour lists** are only modestly above chance and much less stable than BERT’s — neighbour tables from W2V/FT are weak findings here.  
-3. W2V/FT **cos\*** is near 1 (little A/B contrast). **PPMI** is most discriminative for collocates; **BERT** sits in between.  
-4. At ~10k posts/corpus, re-run the same battery before stronger claims about predictive embeddings.
-
-Usable individual anchors (frequency ≥ 20 in the weaker corpus **and** reliability gate): about **12/71** under PPMI and **8/71** under BERT. Prefer **domain-level** claims.
+1. W2V/FT **domain profiles** are stable (rel ≈ 0.99).  
+2. Their **top-15 neighbour lists** beat chance but stay well below BERT — neighbour tables from W2V/FT are still the weak finding.  
+3. W2V/FT **cos\*** is near 1 (little A/B contrast). **PPMI** is most discriminative for collocates; **BERT** sits in between.
 
 ---
 
@@ -160,10 +199,10 @@ Design: sentence-clipped ±5-token windows; one post per author for inference; p
 
 | Domain | Emotion distribution A vs B | FDR q |
 |--------|----------------------------|------:|
-| Identity | **Different** | 0.006 |
-| Absence | **Different** | 0.0002 |
+| Identity | **Different** | 0.0003 |
+| Absence | **Different** | 0.0003 |
 | Temporal | **Different** | 0.0003 |
-| Digital | Not significant | 0.80 |
+| Digital | **Different** | 0.0003 |
 
 This is a **window proxy** for aspect-based emotion (emotion of local context; aspect ≈ anchor), not a trained ABSA model.
 
@@ -175,7 +214,7 @@ This is a **window proxy** for aspect-based emotion (emotion of local context; a
 
 ![Emotion difference heatmap](docs/figures/p3_19_emotion_difference_heatmap.png)
 
-Identity / Absence / Temporal show clear distributional shifts; Digital does not survive FDR.
+All four domains show distributional shifts after FDR (q = 0.0003). Digital is no longer the exception: migration windows are more neutral (+0.21), grief windows more surprise/joy. Identity sadness is much higher in grief (−0.17 A−B).
 
 **Co-occurrence networks** (top 300 PPMI edges; exploratory — many edges have low raw counts)
 
@@ -192,11 +231,10 @@ Identity / Absence / Temporal show clear distributional shifts; Digital does not
 ### 3. Topics (Phase 4)
 
 - Method: pooled **NMF** on both corpora, TF–IDF, bootstrap stability selection.  
-- Selected **k = 8**.  
-- Only **Topic 2** meets the high-stability “core” threshold (recurrence ≈ 0.95): study-abroad / university language, **higher loading in Corpus A**.  
-- Other topics (e.g. hospital/loss, homesick, job/move, family bereavement) appear but are **unstable** across restarts — report cautiously.
+- Selected **k = 12** (k-sweep k=8 has the highest mean agreement 0.96, but k=12 keeps 11/12 core topics and a higher agreement-above-null).  
+- **11/12** topics meet the core recurrence threshold. A-loaded: university/application, study-abroad program, language/culture, passport/citizenship, move/job. B-loaded: father loss, mom/sister cancer, grief support, love-miss, family deaths, hospital days. Shared: friends/talk.
 
-**Topic prevalence by corpus** (★ marks the only core/stable topic)
+**Topic prevalence by corpus** (★ marks core topics)
 
 ![Topic prevalence](docs/figures/p4_20_topic_prevalence.png)
 
@@ -210,11 +248,11 @@ Identity / Absence / Temporal show clear distributional shifts; Digital does not
 
 | Works well now | Weak / incomplete |
 |----------------|-------------------|
-| Domain-level PPMI and BERT comparison | Sample size ≪ 10k/corpus |
-| Frozen BERT neighbour stability | Most individual anchors too rare for inference |
-| Emotion differences for Identity / Absence / Temporal | Digital emotion n.s.; true ABSA not trained |
-| Explicit multi-method evaluation of W2V/FT | W2V/FT neighbours not trustworthy at this N |
-| Stability-selected topics (honest core count) | Only one core topic |
+| 10k/10k sampling frame with documented quotas | Most individual anchors still too rare for inference |
+| Domain-level PPMI and BERT comparison (4/4 FDR) | True ABSA not trained (window proxy only) |
+| Frozen BERT neighbour stability | Manual coding of the 150-window sample |
+| Emotion differences for all four domains | W2V/FT neighbours weaker than BERT |
+| Stability-selected topics (11/12 core at k=12) | BERT/PPMI disagree on the sign of digital vs temporal; declared pair hypotheses mostly fail (see `p2_14_hypothesis_outcomes.csv`) |
 
 ### Figure index
 
@@ -249,10 +287,7 @@ pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
 
-Apify auth (pick one):
-
-- `apify login` (CLI keyring), or  
-- `$env:APIFY_TOKEN = "apify_api_..."` from [Apify Integrations](https://console.apify.com/settings/integrations)
+The 2026-08-27 rebuild did **not** use Apify. Collection is Arctic Shift (`scripts/31_scrape_arctic_shift.py`) plus already-downloaded dumps. Apify auth below is only needed if you revive the old scraper.
 
 ### Analysis environment (Phases 2–4)
 
@@ -272,25 +307,18 @@ python -m venv .venv-analysis
 
 ---
 
-## Data collection (optional)
+## Data collection
 
-Scraping costs Apify credits. Pilot first:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-python scripts/01_scrape_apify.py --mode pilot --corpus both --listings-only
-```
-
-Full collection (example — sequential is safest on limited concurrent memory):
+Current rebuild (no Apify credits):
 
 ```powershell
-python scripts/01_scrape_apify.py --mode full --corpus both --engine trudax --searches-only --resume --workers 1 --timeout 3600
-python scripts/03_filter_and_normalize.py
-python scripts/04_preprocess_nlp.py
+.\.venv-analysis\Scripts\python.exe scripts\31_scrape_arctic_shift.py
+.\.venv-analysis\Scripts\python.exe scripts\03_filter_and_normalize.py
+.\.venv-analysis\Scripts\python.exe scripts\04_preprocess_nlp.py
+.\.venv-analysis\Scripts\python.exe scripts\08_reprocess_tokens.py
 ```
 
-Config: `config/filters.yaml`, `config/scrape_runs.yaml`.  
-Ops notes: `docs/SPEED.md`, `docs/HOME_RESUME.md`.
+Config: `config/filters.yaml`. Sampling audit: `data/processed/PHASE1_COMPLETE.md`.
 
 ---
 
@@ -327,16 +355,16 @@ Published copies of the main figures are kept in `docs/figures/` for the README.
 |--------|------|
 | **PPMI** | Shared-basis context profiles; strongest A/B collocational contrast |
 | **BERT** (`bert-base-uncased`) | Frozen contextual senses; stable neighbours at current N |
-| **Word2Vec / FastText** | Trained on-site; second-order profiles stable, neighbour lists weak at current N |
+| **Word2Vec / FastText** | Trained on-site; profiles stable, neighbour lists weaker than BERT |
 | **Emotion** | DistilRoBERTa-emotion on ±5-token anchor windows (ABSA *proxy*) |
-| **Topics** | Pooled NMF with bootstrap stability (selected k=8) |
+| **Topics** | Pooled NMF with bootstrap stability (selected k=12) |
 
-Interpretation limits (current sample sizes ~906 / 687):
+Interpretation limits (current sample sizes 10,000 / 10,000):
 
-- Prefer **domain-level** claims; most individual anchors are rare.  
-- Digital domain is fragile (polysemy / sparse tech terms).  
+- Prefer **domain-level** claims; most individual anchors are still rare in one corpus.  
+- Digital remains the sparsest domain (~8% of posts) even though emotion and PPMI now clear FDR.  
 - Emotion is a window proxy, not a trained aspect model.  
-- Only one NMF topic currently meets the high-stability “core” bar (study-abroad language).
+- NMF k=12 has 11 core topics; k=8 has higher mean agreement but fewer distinct cores in the selected model.
 
 ---
 

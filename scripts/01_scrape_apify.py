@@ -81,6 +81,12 @@ def load_yaml(path: Path) -> dict:
 
 
 def resolve_token() -> str | None:
+    try:
+        from apify_auth import resolve_token as _resolve
+
+        return _resolve()
+    except Exception:
+        pass
     token = os.environ.get("APIFY_TOKEN") or os.environ.get("APIFY_API_TOKEN")
     if token:
         return token

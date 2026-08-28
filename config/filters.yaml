@@ -1,8 +1,10 @@
 # Phase 1 filtering rules for Corpus A (migration) and Corpus B (grief)
 
 date_from: "2023-07-01"   # last ~3 years (relative to 2026-07)
-min_word_count: 100
+date_to: "2026-08-24"     # exclusive; every subreddit's archive walk is complete to here
+min_word_count: 100       # applies to the BODY only (Phase 1 brief: "main body ... longer than 100 words")
 target_posts_per_corpus: 10000
+sampling_seed: 20260827   # seeded random selection inside each subreddit quota
 
 # Case-insensitive partial match on post flair (soft preference; missing flair is kept)
 include_flairs:
@@ -15,6 +17,15 @@ include_flairs:
   - story
   - emotional support
   - seeking support
+
+# Corpus A only: drop posts whose flair marks procedural content the keyword
+# blacklist cannot catch semantically. Case-insensitive substring match.
+exclude_flairs_corpus_a:
+  - visa
+  - citizen
+  - red tape
+  - tax
+  - financial
 
 # Applied mainly to Corpus A (title + body). Drops paperwork/visa Q&A.
 exclude_keywords_corpus_a:

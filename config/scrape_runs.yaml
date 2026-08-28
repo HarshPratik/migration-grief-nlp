@@ -42,10 +42,10 @@ pilot:
   maxPostCount: 50
 
 full:
-  # Smaller batches finish before Reddit 403/timeouts; more runs → more unique posts
-  maxResults: 100
-  maxItems: 80
-  maxPostCount: 80
+  # Larger batches when runs complete; 100 is a good unique/cost tradeoff for trudax
+  maxResults: 120
+  maxItems: 100
+  maxPostCount: 100
 
 # Listing sorts (labrat subreddit_posts + trudax startUrls)
 listing_sorts:

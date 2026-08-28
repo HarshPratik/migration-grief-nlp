@@ -36,7 +36,8 @@ PINNED = {
 
 # Packages deliberately excluded - see requirements-analysis.txt for reasons.
 # Their presence means someone installed outside the constraints file.
-BANNED = ("gensim", "umap", "hdbscan", "bertopic", "numba")
+# gensim>=4.3 is allowed (numpy 2 compatible) for Word2Vec/FastText evaluation.
+BANNED = ("umap", "hdbscan", "bertopic", "numba")
 
 REPORT_PACKAGES = (
     "numpy", "pandas", "pyarrow", "scipy", "sklearn", "matplotlib",
@@ -162,13 +163,27 @@ def check_corpus_roundtrip() -> str:
     if not path.exists():
         raise FileNotFoundError(f"{path} missing - run Phase 1 first, or pass --skip-corpus")
     df = pd.read_parquet(path)
-    assert len(df.columns) == 18, f"expected 18 columns, got {len(df.columns)}"
+    required = {
+        "post_id",
+        "corpus",
+        "subreddit",
+        "title",
+        "body",
+        "text",
+        "created_at",
+        "tokens",
+        "body_word_count",
+    }
+    missing = required - set(df.columns)
+    assert not missing, f"missing columns: {sorted(missing)}"
+    assert len(df.columns) >= 18, f"expected at least 18 columns, got {len(df.columns)}"
     kind = type(df["tokens"].iloc[0]).__name__
     assert kind == "ndarray", (
         f"`tokens` came back as {kind}, not ndarray. The as_token_list() helper in "
         "scripts/text_windows.py assumes ndarray; re-check it before trusting results."
     )
     assert df["created_at"].dt.tz is not None, "created_at lost its timezone"
+    assert int((df["body_word_count"] <= 100).sum()) == 0, "body-only >100 word rule failed"
     return f"{len(df)} rows x {len(df.columns)} cols, tokens={kind}"
 
 
@@ -214,23 +229,24 @@ def check_vader() -> str:
 
 
 def check_torch_optional() -> str:
-    """Optional until the transformer layer is installed - but if present,
-    it must be the CPU build. A CUDA wheel is ~2.5 GB of wasted disk."""
+    """Optional until the transformer layer is installed.
+
+    Prefer CUDA when a local NVIDIA GPU is present; otherwise the CPU wheel.
+    """
     import importlib.util
 
     if importlib.util.find_spec("torch") is None:
         warnings.append(
             "torch not installed yet - Stage 6 (emotion classification) needs it. "
-            "Install: pip install --index-url https://download.pytorch.org/whl/cpu torch"
+            "Install CUDA: pip install --index-url https://download.pytorch.org/whl/cu128 torch "
+            "(or the CPU index if no NVIDIA GPU is available)."
         )
         return "not installed (optional until Stage 6)"
     import torch
 
     if torch.cuda.is_available():
-        raise AssertionError(
-            "CUDA torch detected. Expected the CPU-only build - reinstall with "
-            "--index-url https://download.pytorch.org/whl/cpu"
-        )
+        name = torch.cuda.get_device_name(0)
+        return f"{torch.__version__} (CUDA {torch.version.cuda}, {name})"
     return f"{torch.__version__} (CPU)"
 
 
