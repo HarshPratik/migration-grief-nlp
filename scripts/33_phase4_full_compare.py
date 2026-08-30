@@ -509,7 +509,14 @@ def main() -> int:
                 fig, _ = fig_network(
                     g, style=style,
                     title=f"Corpus {lab.upper()} LDA k=12 topic-keyword network",
-                    node_colors=node_colors, node_sizes=sizes, label_top_n=28,
+                    node_colors=node_colors, node_sizes=sizes, label_top_n=36,
+                    color_legend={
+                        "Temporal": colors["temporal"],
+                        "Identity": colors["identity"],
+                        "Absence": colors["absence"],
+                        "Digital": colors["digital"],
+                        "Other": colors["other"],
+                    },
                 )
                 pngs = save_fig(fig, out_path("figures", "p4", 33, "topic_network", lab),
                                 formats=list(cfg.get("figures.formats")))

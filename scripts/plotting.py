@@ -295,6 +295,88 @@ def fig_hist(
     return fig, ax
 
 
+def _drawable_subgraph(graph, *, max_nodes: int = 70, max_edges: int = 110):
+    """Keep a readable backbone: drop isolates, cap nodes/edges, keep large components."""
+    import networkx as nx
+
+    g = graph.copy()
+    g.remove_nodes_from(list(nx.isolates(g)))
+    if g.number_of_nodes() == 0:
+        return graph.copy()
+
+    if g.number_of_nodes() > max_nodes:
+        keep = {n for n, _ in sorted(g.degree(weight="weight"), key=lambda kv: -kv[1])[:max_nodes]}
+        g = g.subgraph(keep).copy()
+        g.remove_nodes_from(list(nx.isolates(g)))
+
+    if g.number_of_edges() > max_edges:
+        strongest = sorted(
+            g.edges(data=True),
+            key=lambda e: -float(e[2].get("weight", 1.0)),
+        )[:max_edges]
+        trimmed = nx.Graph()
+        trimmed.add_nodes_from(g.nodes(data=True))
+        trimmed.add_edges_from(strongest)
+        trimmed.remove_nodes_from(list(nx.isolates(trimmed)))
+        g = trimmed
+
+    if g.number_of_nodes() and not nx.is_connected(g):
+        components = sorted(nx.connected_components(g), key=len, reverse=True)
+        keep: set = set()
+        for comp in components:
+            if len(comp) >= 3 and len(keep) + len(comp) <= max_nodes + 10:
+                keep |= comp
+            if len(keep) >= 20:
+                break
+        if not keep:
+            keep = components[0]
+        g = g.subgraph(keep).copy()
+    return g
+
+
+def _layout_components(graph, *, seed: int, iterations: int, prefer_kamada: bool) -> dict:
+    """Layout each connected component, then tile them so clusters do not collapse
+    to opposite corners of a mostly-empty canvas."""
+    import networkx as nx
+
+    components = [graph.subgraph(c).copy() for c in nx.connected_components(graph)]
+    components.sort(key=lambda g: -g.number_of_nodes())
+    n_comp = max(len(components), 1)
+    cols = 1 if n_comp == 1 else 2
+    rows = int(np.ceil(n_comp / cols))
+    positions: dict = {}
+    for i, comp in enumerate(components):
+        n = comp.number_of_nodes()
+        if n == 1:
+            local = {next(iter(comp.nodes())): np.array([0.0, 0.0])}
+        elif prefer_kamada or (n <= 25 and nx.is_connected(comp)):
+            try:
+                local = nx.kamada_kawai_layout(comp)
+            except Exception:
+                local = nx.spring_layout(
+                    comp, seed=seed + i, iterations=iterations,
+                    k=2.4 / np.sqrt(n), weight=None,
+                )
+        else:
+            local = nx.spring_layout(
+                comp, seed=seed + i, iterations=iterations,
+                k=2.8 / np.sqrt(n), weight=None,
+            )
+        xs = np.array([p[0] for p in local.values()])
+        ys = np.array([p[1] for p in local.values()])
+        span_x = max(float(xs.max() - xs.min()), 1e-6)
+        span_y = max(float(ys.max() - ys.min()), 1e-6)
+        xs = (xs - xs.mean()) / span_x
+        ys = (ys - ys.mean()) / span_y
+        col, row = i % cols, i // cols
+        ox = (col - (cols - 1) / 2.0) * 1.55
+        oy = ((rows - 1) / 2.0 - row) * 1.55
+        nodes = list(local.keys())
+        for j, node in enumerate(nodes):
+            positions[node] = np.array([xs[j] + ox, ys[j] + oy])
+    return positions
+
+
 def fig_network(
     graph,
     *,
@@ -304,51 +386,117 @@ def fig_network(
     node_sizes: Mapping[str, float] | None = None,
     layout: str = "spring",
     layout_seed: int = 7,
-    layout_iterations: int = 200,
-    label_top_n: int = 40,
+    layout_iterations: int = 400,
+    label_top_n: int = 36,
+    color_legend: Mapping[str, str] | None = None,
+    max_nodes: int = 70,
+    max_edges: int = 110,
 ):
     """Co-occurrence network. The layout seed is required, not optional -
-    an unseeded spring layout redraws differently on every run."""
+    an unseeded spring layout redraws differently on every run.
+
+    Dense graphs are thinned to a readable backbone (top-degree nodes and
+    strongest edges). Isolates are dropped so spring layout cannot fling
+    them to the corners. Labels sit on a white halo, offset from the hull.
+    """
     import networkx as nx
+    from matplotlib.patches import Patch
 
     if graph.number_of_nodes() == 0:
         raise ValueError("cannot draw an empty graph")
 
-    if layout == "kamada_kawai":
-        positions = nx.kamada_kawai_layout(graph)
-    elif layout == "circular":
-        positions = nx.circular_layout(graph)
+    drawn = _drawable_subgraph(graph, max_nodes=max_nodes, max_edges=max_edges)
+    if drawn.number_of_nodes() == 0:
+        drawn = graph.copy()
+
+    n = drawn.number_of_nodes()
+    if layout == "circular":
+        positions = nx.circular_layout(drawn)
     else:
-        positions = nx.spring_layout(
-            graph, seed=layout_seed, iterations=layout_iterations, weight="weight"
+        positions = _layout_components(
+            drawn,
+            seed=layout_seed,
+            iterations=max(layout_iterations, 400),
+            prefer_kamada=(layout == "kamada_kawai"),
         )
 
-    size = max(style["width_in"], 9.0)
-    fig, ax = plt.subplots(figsize=(size, size * 0.75))
-
-    weights = [graph[u][v].get("weight", 1.0) for u, v in graph.edges()]
-    widths = np.array(weights, dtype=float)
-    if widths.size and widths.max() > widths.min():
-        widths = 0.3 + 2.4 * (widths - widths.min()) / (widths.max() - widths.min())
-    else:
-        widths = np.full(max(widths.size, 1), 0.8)
-
-    nx.draw_networkx_edges(graph, positions, ax=ax, width=widths, alpha=0.28, edge_color="#888888")
-    nx.draw_networkx_nodes(
-        graph, positions, ax=ax,
-        node_color=[node_colors.get(n, "#4C78A8") for n in graph.nodes()] if node_colors else "#4C78A8",
-        node_size=[node_sizes.get(n, 90.0) for n in graph.nodes()] if node_sizes else 90.0,
-        linewidths=0.0,
-    )
-
-    ranked = sorted(graph.degree(weight="weight"), key=lambda kv: -kv[1])[:label_top_n]
-    nx.draw_networkx_labels(
-        graph, positions, ax=ax,
-        labels={n: n for n, _ in ranked},
-        font_size=style["base_font_size"] - 3,
-    )
-
+    fig, ax = plt.subplots(figsize=(10.5, 10.5))
     ax.set_axis_off()
+    ax.grid(False)
+
+    weights = [float(drawn[u][v].get("weight", 1.0)) for u, v in drawn.edges()]
+    widths = np.asarray(weights, dtype=float)
+    if widths.size and widths.max() > widths.min():
+        widths = 0.4 + 2.0 * (widths - widths.min()) / (widths.max() - widths.min())
+    else:
+        widths = np.full(max(widths.size, 1), 0.7)
+
+    nx.draw_networkx_edges(
+        drawn, positions, ax=ax, width=widths.tolist(),
+        alpha=0.35, edge_color="#9AA0A6",
+    )
+
+    default_color = "#4C78A8"
+    colors = [node_colors.get(n, default_color) if node_colors else default_color for n in drawn.nodes()]
+    raw_sizes = np.array(
+        [float(node_sizes.get(n, 120.0)) if node_sizes else 120.0 for n in drawn.nodes()],
+        dtype=float,
+    )
+    if raw_sizes.max() > raw_sizes.min():
+        sizes = 140 + 420 * (raw_sizes - raw_sizes.min()) / (raw_sizes.max() - raw_sizes.min())
+    else:
+        sizes = np.full(raw_sizes.size, 220.0)
+
+    nx.draw_networkx_nodes(
+        drawn, positions, ax=ax,
+        node_color=colors,
+        node_size=sizes.tolist(),
+        linewidths=0.6,
+        edgecolors="white",
+        alpha=0.95,
+    )
+
+    ranked = sorted(drawn.degree(weight="weight"), key=lambda kv: -kv[1])[: min(label_top_n, n)]
+    xs = np.array([positions[n][0] for n in drawn.nodes()])
+    ys = np.array([positions[n][1] for n in drawn.nodes()])
+    cx, cy = float(xs.mean()), float(ys.mean())
+    font_size = max(7, int(style["base_font_size"]) - 2)
+    used: list[tuple[float, float]] = []
+    for node, _ in ranked:
+        x, y = positions[node]
+        dx, dy = x - cx, y - cy
+        hypot = float(np.hypot(dx, dy)) or 1.0
+        ox, oy = 10.0 * dx / hypot, 10.0 * dy / hypot
+        # nudge away from already-placed labels
+        for ux, uy in used:
+            if abs((x + ox / 80.0) - ux) < 0.045 and abs((y + oy / 80.0) - uy) < 0.045:
+                ox *= 1.55
+                oy *= 1.55
+        ax.annotate(
+            str(node),
+            (x, y),
+            xytext=(ox, oy),
+            textcoords="offset points",
+            fontsize=font_size,
+            ha="center",
+            va="center",
+            color="#1a1a1a",
+            bbox={"boxstyle": "round,pad=0.18", "fc": "white", "ec": "#dddddd", "alpha": 0.92},
+        )
+        used.append((x + ox / 80.0, y + oy / 80.0))
+
+    if color_legend:
+        handles = [Patch(facecolor=c, edgecolor="none", label=lab) for lab, c in color_legend.items()]
+        ax.legend(handles=handles, loc="lower left", frameon=True, framealpha=0.9, fontsize=font_size)
+
+    note = (
+        f"{drawn.number_of_nodes()} nodes, {drawn.number_of_edges()} strongest edges "
+        f"(isolates dropped; labels = highest-degree terms)"
+    )
+    ax.text(0.0, -0.02, note, transform=ax.transAxes, ha="left", va="top", fontsize=8, color="#555555")
+
     if title:
-        ax.set_title(title)
+        ax.set_title(title, pad=12)
+    ax.margins(0.08)
+    fig.tight_layout()
     return fig, ax

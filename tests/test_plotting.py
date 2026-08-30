@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from plotting import apply_style, fig_heatmap, save_fig
+from plotting import apply_style, fig_heatmap, fig_network, save_fig
 
 
 def test_apply_style_returns_a_style_dict_with_dpi():
@@ -24,6 +24,19 @@ def test_fig_heatmap_and_save_fig_write_a_png(tmp_path, style):
     matrix = np.arange(6, dtype=float).reshape(2, 3)
     fig, _ = fig_heatmap(matrix, ["r0", "r1"], ["c0", "c1", "c2"], style=style, title="t")
     (written,) = save_fig(fig, tmp_path / "heat", dpi=72)
+    assert written.suffix == ".png"
+    assert written.stat().st_size > 0
+
+
+def test_fig_network_writes_a_png_for_a_small_graph(tmp_path, style):
+    import networkx as nx
+
+    g = nx.Graph()
+    g.add_edge("lost", "gone", weight=4.0)
+    g.add_edge("lost", "alone", weight=3.0)
+    g.add_node("lost", freq=10, domain="absence")
+    fig, _ = fig_network(g, style=style, title="t", label_top_n=5)
+    (written,) = save_fig(fig, tmp_path / "net", dpi=72)
     assert written.suffix == ".png"
     assert written.stat().st_size > 0
 

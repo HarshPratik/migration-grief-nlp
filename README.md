@@ -208,13 +208,13 @@ This is a **window proxy** for aspect-based emotion (emotion of local context; a
 
 ### Co-occurrence networks
 
-Top 300 PPMI edges. Exploratory: many edges have low raw counts.
+Seed-dictionary subgraphs (Temporal / Identity / Absence / Digital). Node colour = domain. The full 300-edge PPMI dump is mostly tight closed-class clusters in other languages, so the README figure keeps the research terms.
 
-**Corpus A — migration**
+**Corpus A — migration** (identity cluster left; time/distance cluster right)
 
 ![Co-occurrence A](docs/figures/p3_20_cooccurrence__a.png)
 
-**Corpus B — grief**
+**Corpus B — grief** (absence cluster left; time/distance cluster right)
 
 ![Co-occurrence B](docs/figures/p3_20_cooccurrence__b.png)
 
@@ -294,7 +294,7 @@ Script: [`scripts/33_phase4_full_compare.py`](scripts/33_phase4_full_compare.py)
 
 LDA on B is peakier (one family-loss topic takes ~56% mean θ). NMF spreads mass more evenly. MiniLM recovers finer clusters (homesickness vs deportation vs study logistics on A; ambulance/CPR vs bereavement resources on B) but does not create a Digital–Absence topic either.
 
-**Corpus A — LDA k=12 topic-keyword network** (Identity / Time / Digital / Absence coloured)
+**Corpus A — LDA k=12 topic-keyword network** (strongest co-occurrence backbone; labels = highest-degree terms)
 
 ![Topic network A](docs/figures/p4_33_topic_network__a.png)
 
@@ -342,8 +342,8 @@ Numeric tables regenerate locally under `outputs/tables/p4_33_alignment.csv`, `p
 | cos\* PPMI vs BERT | [p2_23_cosstar_ppmi_vs_contextual.png](docs/figures/p2_23_cosstar_ppmi_vs_contextual.png) |
 | Emotion stacked bars | [p3_19_emotion_stacked_domain.png](docs/figures/p3_19_emotion_stacked_domain.png) |
 | Emotion difference heatmap | [p3_19_emotion_difference_heatmap.png](docs/figures/p3_19_emotion_difference_heatmap.png) |
-| Co-occurrence A | [p3_20_cooccurrence__a.png](docs/figures/p3_20_cooccurrence__a.png) |
-| Co-occurrence B | [p3_20_cooccurrence__b.png](docs/figures/p3_20_cooccurrence__b.png) |
+| Seed-domain co-occurrence A | [p3_20_cooccurrence__a.png](docs/figures/p3_20_cooccurrence__a.png) |
+| Seed-domain co-occurrence B | [p3_20_cooccurrence__b.png](docs/figures/p3_20_cooccurrence__b.png) |
 | Topic prevalence (pooled NMF) | [p4_20_topic_prevalence.png](docs/figures/p4_20_topic_prevalence.png) |
 | Topic stability (pooled NMF) | [p4_20_topic_stability.png](docs/figures/p4_20_topic_stability.png) |
 | Independent topic network A | [p4_33_topic_network__a.png](docs/figures/p4_33_topic_network__a.png) |

@@ -18,28 +18,70 @@ from analysis_io import banner, item, out_path, save_summary  # noqa: E402
 from plotting import apply_style, fig_grouped_bar, fig_network, save_fig  # noqa: E402
 
 
+DOMAIN_COLORS = {
+    "temporal": "#4C78A8",
+    "identity": "#72B7B2",
+    "absence": "#E45756",
+    "digital": "#F58518",
+}
+
+
+def _seed_domain_graph(corpus: str) -> nx.Graph:
+    """Union of per-domain PPMI subgraphs so the figure is about the seed dictionary."""
+    merged = nx.Graph()
+    for domain in ("temporal", "identity", "absence", "digital"):
+        path = out_path("networks", "p3", 16, "cooccur", corpus, domain, ext="graphml")
+        if not path.exists():
+            continue
+        part = nx.read_graphml(path)
+        for node, data in part.nodes(data=True):
+            attrs = dict(data)
+            attrs["domain"] = domain
+            merged.add_node(node, **attrs)
+        merged.add_edges_from(part.edges(data=True))
+    return merged
+
+
 def network_figures(cfg, style) -> list[Path]:
     written: list[Path] = []
     for corpus in ("a", "b"):
-        path = out_path("networks", "p3", 16, "cooccur", corpus, ext="graphml")
-        if not path.exists():
-            raise SystemExit(f"missing {path}; run scripts/16_cooccurrence.py first")
-        graph = nx.read_graphml(path)
+        graph = _seed_domain_graph(corpus)
+        if graph.number_of_nodes() == 0:
+            path = out_path("networks", "p3", 16, "cooccur", corpus, ext="graphml")
+            if not path.exists():
+                raise SystemExit(f"missing {path}; run scripts/16_cooccurrence.py first")
+            graph = nx.read_graphml(path)
         sizes = {
-            node: 35.0 + 20.0 * np.log1p(float(data.get("freq", 0)))
+            node: 80.0 + 28.0 * np.log1p(float(data.get("freq", data.get("count", 1))))
+            for node, data in graph.nodes(data=True)
+        }
+        node_colors = {
+            node: DOMAIN_COLORS.get(str(data.get("domain", "")), "#4C78A8")
             for node, data in graph.nodes(data=True)
         }
         fig, _ = fig_network(
             graph, style=style,
-            title=f"Corpus {corpus.upper()} co-occurrence network (exploratory)",
+            title=f"Corpus {corpus.upper()} seed-domain co-occurrence (PPMI)",
             node_sizes=sizes,
-            layout=str(cfg.get("cooccurrence.layout")),
+            node_colors=node_colors,
+            layout="spring",
             layout_seed=int(cfg.get("cooccurrence.layout_seed")),
             layout_iterations=int(cfg.get("cooccurrence.layout_iterations")),
-            label_top_n=18,
+            label_top_n=40,
+            color_legend={
+                "Temporal": DOMAIN_COLORS["temporal"],
+                "Identity": DOMAIN_COLORS["identity"],
+                "Absence": DOMAIN_COLORS["absence"],
+                "Digital": DOMAIN_COLORS["digital"],
+            },
+            max_nodes=80,
+            max_edges=120,
         )
         written.extend(save_fig(fig, out_path("figures", "p3", 20, "cooccurrence", corpus),
                                 formats=list(cfg.get("figures.formats"))))
+        dest = ROOT / "docs" / "figures" / f"p3_20_cooccurrence__{corpus}.png"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(out_path("figures", "p3", 20, "cooccurrence", corpus).with_suffix(".png").read_bytes())
     return written
 
 
