@@ -1,6 +1,6 @@
 # Methods and results on the current corpora (no new scraping)
 
-**Last updated:** 2026-08-28  
+**Last updated:** 2026-08-30  
 **Analysis corpora:** Corpus A (migration) **10,000** posts; Corpus B (grief) **10,000** posts (`data/analysis/`).  
 **Seed dictionary:** 4 domains, **71** anchors (`config/anchors.yaml`, from `phases/Seed Dictionary.docx`).  
 **Sampling:** Arctic Shift rebuild, seed `20260827`, window `2023-07-01 ≤ created_at < 2026-08-24`. See `data/processed/PHASE1_COMPLETE.md`.
@@ -17,7 +17,7 @@ This document records what was run against the phase briefs on the 10k/10k sampl
 | Phase 2 | Preprocess; embeddings; top-15 neighbors A/B; cosine A vs B; CSV/Excel; PCA/t-SNE | **Done** (PPMI, BERT, Word2Vec, FastText) |
 | Phase 3 | Emotion on anchor windows; ABSA-style; stats; matrices; stacked bars/heatmaps | **Done** (window-proxy ABSA + DistilRoBERTa-emotion) |
 | Seed dict | Four domains | **Done** |
-| Topics (pipeline Phase 4) | Topic model | **Done** (pooled NMF, k=12, 11/12 core) |
+| Topics (pipeline Phase 4) | Topic model | **Done** (pooled NMF k=12, 11/12 core; independent LDA/NMF k=10,12,15; MiniLM k=12) |
 
 Word2Vec and FastText **are evaluated empirically** on these corpora (not dismissed without a run). They are trained from the research texts; reliability uses split-half **re-training** and second-order profiles over the shared basis (alignment-free). Frozen BERT still *measures* pretrained senses rather than estimating free parameters per type. See §2.4 and the multi-method scoreboard after `scripts/25_predictive_eval.py` / `scripts/23b_methods_dashboard.py`.
 
@@ -188,6 +188,8 @@ Figures: `p3_19_emotion_stacked_domain.png`, `p3_19_emotion_difference_heatmap.p
 
 ## 5. Phase 4 results (topics)
 
+### 5.1 Pooled NMF (stability-selected)
+
 | Item | Result |
 |------|--------|
 | Method | Pooled NMF, TF-IDF, stability selection |
@@ -196,6 +198,25 @@ Figures: `p3_19_emotion_stacked_domain.png`, `p3_19_emotion_difference_heatmap.p
 | Other topics | Topic 1 (language/culture) is the only non-core at k=12 (recurrence 0.5) |
 
 Figures: `p4_20_topic_prevalence.png`, `p4_20_topic_stability.png`.
+
+### 5.2 Independent models (per corpus)
+
+The Phase 4 brief also asks for **independent** topic models on A and B (not a pooled fit), 10–15 topics, unforced Digital–Absence clustering, keyword co-occurrence, interactive views, and Identity–Time–Digital bridges.
+
+| Item | Result |
+|------|--------|
+| Script | `scripts/33_phase4_full_compare.py` |
+| LDA / NMF | Fitted **separately** on A and on B at **k = 10, 12, 15** |
+| MiniLM | `all-MiniLM-L6-v2` embeddings + KMeans + class-based TF-IDF at **k = 12** (CUDA) |
+| Digital–Absence mix at k=12 | **0** topics for LDA, NMF, and MiniLM on both corpora |
+| Digital in top-10 | Almost never; Digital is too sparse to surface as its own topic |
+| Absence | Appears in Corpus B NMF (grief/loss/family), not mixed with Digital |
+| Networks | LDA k=12 topic-keyword GraphML + PNG; Identity / Time / Digital / Absence bridges in `p4_33_domain_bridges.csv` |
+| Interactive | `docs/figures/p4_33_interactive__{lda,nmf,minilm}__{a,b}.html` |
+
+Independent models do **not** force Digital and Absence into one cluster. That is the honest result of leaving the clustering unforced.
+
+Figures: `p4_33_topic_network__{a,b}.png`. Tables regenerate under `outputs/tables/p4_33_*`.
 
 ---
 
@@ -207,7 +228,7 @@ Figures: `p4_20_topic_prevalence.png`, `p4_20_topic_stability.png`.
 2. **Frozen BERT** sense vectors with document-level caching (stable split-half reliability).  
 3. **PPMI** collocational contrast (clearer A/B *divergence* in cos*).  
 4. **Emotion window proxy** with author clustering + FDR (all four domains, q=0.0003).  
-5. **NMF with stability** (honest: 11/12 core at k=12).  
+5. **NMF with stability** (honest: 11/12 core at k=12). Independent LDA/NMF/MiniLM agree that Digital–Absence does not cluster together when unforced.  
 6. **Reliability gates** — prevents publishing neighbour lists as findings when they are chance-level.
 
 ### Does not work / weak
@@ -242,6 +263,12 @@ cd D:\research_paper
 .\.venv-analysis\Scripts\python.exe run_contextual_phase2.py --from-step reliability
 ```
 
+### Independent Phase 4 topic comparison
+
+```powershell
+.\.venv-analysis\Scripts\python.exe scripts\33_phase4_full_compare.py
+```
+
 ### Neighbour long-form from comparison CSVs
 
 ```powershell
@@ -264,9 +291,10 @@ data/analysis/vectors/*_contextual.npz
 data/analysis/vectors/contextual_cache/
 outputs/tables/p2_09_* … p2_14_* … p2_23_*
 outputs/tables/p3_11_* p3_15_* p3_16_* p3_22_*
-outputs/tables/p4_17_*
-outputs/figures/p2_18_* p2_23_* p3_19_* p3_20_* p4_20_*
+outputs/tables/p4_17_* p4_33_*
+outputs/figures/p2_18_* p2_23_* p3_19_* p3_20_* p4_20_* p4_33_*
 outputs/networks/*.graphml
+scripts/33_phase4_full_compare.py
 docs/METHODS_RESULTS.md   ← this file
 run_analysis.py
 run_contextual_phase2.py
@@ -282,7 +310,7 @@ On the **10k/10k** sample (rebuild 2026-08-27; no further scraping needed):
 - **BERT:** the same domains are **highly similar** across corpora (cos\* 0.86–0.97) but still not interchangeable under a permutation null (q = 0.002).  
 - **Declared domain-pair hypotheses** mostly **fail or split by method.** Both PPMI and BERT put *temporal vs absence* closer in **migration**, opposite the brief. BERT and PPMI **disagree on the sign** of *digital vs temporal*. See `outputs/tables/p2_14_hypothesis_outcomes.csv`.  
 - **Emotion** around anchors differs for **all four** domains (q = 0.0003), including Digital (migration windows more neutral). This is a window proxy, not trained ABSA.  
-- **Topics:** pooled NMF **k = 12** keeps **11/12** core themes (A: university / study-abroad / passport / move-job; B: family death / cancer / grief support; shared: friends). k = 8 is more stable if you want fewer, cleaner cores.  
+- **Topics:** pooled NMF **k = 12** keeps **11/12** core themes (A: university / study-abroad / passport / move-job; B: family death / cancer / grief support; shared: friends). k = 8 is more stable if you want fewer, cleaner cores. Independent LDA/NMF (k=10,12,15) and MiniLM k=12 find **no Digital–Absence mixed topic** on either corpus.  
 - Report **PPMI and BERT together**. Word2Vec/FastText were run: domain profiles are stable, neighbour lists are the weak finding — do not headline them.
 
 Digital coverage is still sparse (~8% of posts; **~2.6%** if polysemous anchors such as *connection* are dropped). Prefer **domain-level** claims; most individual seeds remain rare.

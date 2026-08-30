@@ -27,7 +27,7 @@ Collection is Arctic Shift (no Apify on the current 10k rebuild). Analysis cover
 - Seed dictionary: 4 domains, 71 anchors (`config/anchors.yaml`).
 - Phase 2: PPMI, frozen BERT, Word2Vec, FastText, reliability gates, top-15 neighbours, PCA/t-SNE.
 - Phase 3: DistilRoBERTa-emotion on ±5-token windows (ABSA **proxy**, not a trained aspect model). All four domains differ after FDR (q = 0.0003).
-- Phase 4: pooled NMF, **k = 12**, 11/12 core topics.
+- Phase 4: pooled NMF, **k = 12**, 11/12 core topics; plus **independent** LDA/NMF (k=10,12,15) and MiniLM topic models per corpus.
 - Publication figures in [`docs/figures/`](docs/figures/). Longer write-up: [`docs/METHODS_RESULTS.md`](docs/METHODS_RESULTS.md).
 
 ### Left to do
@@ -54,6 +54,7 @@ python -m venv .venv-analysis
 .\.venv-analysis\Scripts\python.exe run_analysis.py
 .\.venv-analysis\Scripts\python.exe run_contextual_phase2.py
 .\.venv-analysis\Scripts\python.exe run_predictive_phase2.py
+.\.venv-analysis\Scripts\python.exe scripts\33_phase4_full_compare.py
 .\.venv-analysis\Scripts\python.exe -m pytest
 ```
 
@@ -78,7 +79,7 @@ data/
 docs/
   figures/        # result figures embedded below
   METHODS_RESULTS.md
-scripts/          # scrape → filter → analysis pipeline
+scripts/          # scrape → filter → analysis pipeline (incl. 33_phase4_full_compare.py)
 tests/            # unit tests for shared analysis helpers
 run_analysis.py   # Phase 2–4 orchestration (PPMI default path)
 run_contextual_phase2.py   # frozen BERT path + methods join
@@ -230,6 +231,8 @@ All four domains show distributional shifts after FDR (q = 0.0003). Digital is n
 
 ### 3. Topics (Phase 4)
 
+**Pooled NMF (stability-selected)**
+
 - Method: pooled **NMF** on both corpora, TF–IDF, bootstrap stability selection.  
 - Selected **k = 12** (k-sweep k=8 has the highest mean agreement 0.96, but k=12 keeps 11/12 core topics and a higher agreement-above-null).  
 - **11/12** topics meet the core recurrence threshold. A-loaded: university/application, study-abroad program, language/culture, passport/citizenship, move/job. B-loaded: father loss, mom/sister cancer, grief support, love-miss, family deaths, hospital days. Shared: friends/talk.
@@ -242,6 +245,22 @@ All four domains show distributional shifts after FDR (q = 0.0003). Digital is n
 
 ![Topic stability](docs/figures/p4_20_topic_stability.png)
 
+**Independent models (per corpus, unforced Digital–Absence clustering)**
+
+- Fit **LDA** and **NMF** separately on A and on B at **k = 10, 12, 15**, plus a MiniLM-L6-v2 embedding + KMeans path at **k = 12** (`scripts/33_phase4_full_compare.py`).  
+- At k=12, **no topic mixes Digital and Absence** on either corpus under LDA, NMF, or MiniLM. Digital anchors almost never enter the top-10 terms; Absence appears in grief NMF (loss/family) as expected. Independent models do **not** force a Digital–Absence cluster.  
+- Interactive topic views and LDA k=12 topic-keyword networks (Identity / Time / Digital / Absence bridges) are in `docs/figures/`.
+
+**Corpus A — LDA k=12 topic-keyword network**
+
+![Topic network A](docs/figures/p4_33_topic_network__a.png)
+
+**Corpus B — LDA k=12 topic-keyword network**
+
+![Topic network B](docs/figures/p4_33_topic_network__b.png)
+
+Interactive HTML: [`p4_33_interactive__lda__a.html`](docs/figures/p4_33_interactive__lda__a.html), [`lda__b`](docs/figures/p4_33_interactive__lda__b.html), [`nmf__a`](docs/figures/p4_33_interactive__nmf__a.html), [`nmf__b`](docs/figures/p4_33_interactive__nmf__b.html), [`minilm__a`](docs/figures/p4_33_interactive__minilm__a.html), [`minilm__b`](docs/figures/p4_33_interactive__minilm__b.html).
+
 ---
 
 ### 4. What works vs what is weak
@@ -253,6 +272,7 @@ All four domains show distributional shifts after FDR (q = 0.0003). Digital is n
 | Frozen BERT neighbour stability | Manual coding of the 150-window sample |
 | Emotion differences for all four domains | W2V/FT neighbours weaker than BERT |
 | Stability-selected topics (11/12 core at k=12) | BERT/PPMI disagree on the sign of digital vs temporal; declared pair hypotheses mostly fail (see `p2_14_hypothesis_outcomes.csv`) |
+| Independent LDA/NMF/MiniLM (no Digital–Absence mix at k=12) | Digital remains too sparse to surface as its own topic |
 
 ### Figure index
 
@@ -269,6 +289,7 @@ All four domains show distributional shifts after FDR (q = 0.0003). Digital is n
 | Co-occurrence A / B | [`p3_20_cooccurrence__a.png`](docs/figures/p3_20_cooccurrence__a.png), [`p3_20_cooccurrence__b.png`](docs/figures/p3_20_cooccurrence__b.png) |
 | Topic prevalence | [`docs/figures/p4_20_topic_prevalence.png`](docs/figures/p4_20_topic_prevalence.png) |
 | Topic stability | [`docs/figures/p4_20_topic_stability.png`](docs/figures/p4_20_topic_stability.png) |
+| Independent topic networks A / B | [`p4_33_topic_network__a.png`](docs/figures/p4_33_topic_network__a.png), [`p4_33_topic_network__b.png`](docs/figures/p4_33_topic_network__b.png) |
 
 Longer methods write-up: [`docs/METHODS_RESULTS.md`](docs/METHODS_RESULTS.md).  
 Full numeric tables regenerate under `outputs/tables/` when you re-run the pipeline locally.
@@ -357,7 +378,7 @@ Published copies of the main figures are kept in `docs/figures/` for the README.
 | **BERT** (`bert-base-uncased`) | Frozen contextual senses; stable neighbours at current N |
 | **Word2Vec / FastText** | Trained on-site; profiles stable, neighbour lists weaker than BERT |
 | **Emotion** | DistilRoBERTa-emotion on ±5-token anchor windows (ABSA *proxy*) |
-| **Topics** | Pooled NMF with bootstrap stability (selected k=12) |
+| **Topics** | Pooled NMF with bootstrap stability (selected k=12); independent LDA/NMF per corpus (k=10,12,15) and MiniLM k=12 |
 
 Interpretation limits (current sample sizes 10,000 / 10,000):
 

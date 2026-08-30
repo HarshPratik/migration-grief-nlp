@@ -76,6 +76,10 @@ annotation/*coded*
 outputs/**
 !outputs/.gitkeep
 
+# --- Local scratch (cloud JSON, one-off helpers) ---
+tmp_*
+tmp_boot_volume*.json
+
 # --- OS / editor ---
 .DS_Store
 Thumbs.db
