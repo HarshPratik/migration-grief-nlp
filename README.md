@@ -24,10 +24,11 @@ This README is the results front page. Longer methods notes: [`docs/METHODS_RESU
 5. [Declared pair hypotheses](#declared-pair-hypotheses)
 6. [Phase 3 - emotion and co-occurrence](#phase-3---emotion-and-co-occurrence)
 7. [Phase 4 - topics](#phase-4---topics)
-8. [What holds vs what is weak](#what-holds-vs-what-is-weak)
-9. [Figure index](#figure-index)
-10. [Reproduce](#reproduce)
-11. [Ethics](#ethics)
+8. [Phase 5 - time from first post](#phase-5---time-from-first-post)
+9. [What holds vs what is weak](#what-holds-vs-what-is-weak)
+10. [Figure index](#figure-index)
+11. [Reproduce](#reproduce)
+12. [Ethics](#ethics)
 
 ---
 
@@ -35,7 +36,7 @@ This README is the results front page. Longer methods notes: [`docs/METHODS_RESU
 
 | | |
 |--|--|
-| **Computational pipeline** | **Done** on the 10k / 10k analysis frame (Phases 1–4) |
+| **Computational pipeline** | **Done** on the 10k / 10k analysis frame (Phases 1–5) |
 | **Ready for** | Drafting the paper from the results below |
 | **Not finished** | Human coding of 150 emotion windows; the paper text itself |
 | **Repo** | **Private.** Row-level CSVs contain Reddit post text — do not make public without ethics review |
@@ -45,8 +46,9 @@ This README is the results front page. Longer methods notes: [`docs/METHODS_RESU
 - Phase 1 sample: 10,000 + 10,000 posts; unique IDs; A ∩ B = 0; no empty/`[removed]` bodies.
 - Seed dictionary: **4 domains, 71 anchors** (`config/anchors.yaml`).
 - Phase 2: PPMI, frozen BERT, Word2Vec, FastText, reliability gates, top-15 neighbours, PCA/t-SNE, methods scoreboard.
-- Phase 3: DistilRoBERTa-emotion on ±5-token windows (ABSA **proxy**). All four domains differ after FDR (q = 0.0003).
-- Phase 4: pooled NMF **k = 12** (11/12 core topics) **and** independent LDA/NMF (k = 10, 12, 15) plus MiniLM k = 12 per corpus. Unforced Digital–Absence mix = **0**.
+- Phase 3: DistilRoBERTa-emotion on ±5-token windows (all four domains differ, q = 0.0003) **and** true ABSA (`yangheng/deberta-v3-base-absa-v1.1`). Identity / absence / temporal polarity differ (q = 0.0004); **Digital is null** (q = 0.486).
+- Phase 4: pooled NMF **k = 12** (11/12 core); independent LDA/NMF (k = 10, 12, 15); MiniLM k = 12; **real BERTopic** 14/14 topics. Unforced Digital–Absence mix = **0** on every method.
+- Phase 5: author-relative timelines, sadness slopes, MiniLM and BERTopic topics-over-time, early vs late PPMI betweenness. **Sadness is stationary in both corpora. Hybrid-node claim is not supported.**
 
 **Still human work**
 
@@ -62,9 +64,15 @@ This README is the results front page. Longer methods notes: [`docs/METHODS_RESU
 | **PPMI** | Do local collocates of a domain look the same in A and B? | Strongest A/B *collocational* contrast |
 | **BERT** (`bert-base-uncased`, frozen) | Do pretrained contextual senses land in the same region? | Stable neighbours; high cross-corpus similarity with a residual difference |
 | **Word2Vec / FastText** | Do *trained-on-site* embeddings recover the same picture? | Profiles stable; neighbour lists weaker than BERT |
-| **Emotion** (DistilRoBERTa, 7 classes) | Does local emotion around anchors differ? | Window proxy for aspect emotion, not trained ABSA |
+| **Emotion** (DistilRoBERTa, 7 classes) | Does local emotion around anchors differ? | Window proxy (context emotion, not attitude toward the anchor) |
+| **True ABSA** (DeBERTa-v3-absa) | Is polarity *about the seed term* different in A vs B? | Identity / absence / temporal yes (q = 0.0004); **Digital no** (q = 0.486) |
 | **Pooled NMF** | Shared topic space with bootstrap stability | k = 12, 11/12 core |
 | **Independent LDA / NMF / MiniLM** | Do A and B grow the *same* topics when fitted separately? Unforced Digital–Absence? | Digital–Absence never co-cluster at k = 12 |
+| **BERTopic** (UMAP + HDBSCAN + c-TF-IDF) | Same unforced check with a density clusterer | 14 topics per corpus; mix still **0**; giant A catch-all of 6,260 posts |
+| **Author-relative time** | Does sadness decay after each user's first post? | T0 is first post in sample, not the origin event; 95% of authors are singletons |
+| **Calendar time** | Same tests on the 2023–2026 window | The clock that actually has mass in later bins |
+| **Topics over time** | Do topics emerge/fade? | MiniLM k=12 and BERTopic DTM; mix still 0 |
+| **Early vs late PPMI graphs** | Do betweenness spikes mark hybrid “points de capiton”? | Year 1 vs Year 3+; one negligible hybrid (`miles`) |
 
 Shared vocabulary basis for comparable profiles: types with frequency ≥ 20 in **both** corpora (**2,286** dimensions).
 
@@ -196,7 +204,7 @@ Both methods put *temporal vs absence* **closer in migration**, opposite the bri
 | Temporal | **Different** | 0.0003 | sadness higher in grief; more neutral in migration |
 | Digital | **Different** | 0.0003 | **neutral +0.21** in migration |
 
-This is a **window proxy** for aspect-based emotion (emotion of local context; aspect ≈ anchor), **not** a trained ABSA model. Human coding of 150 windows is still required before treating labels as validated.
+This DistilRoBERTa run is a **window proxy**: it scores emotion of the local context, not attitude toward the seed term. Human coding of 150 windows is still required before treating those labels as validated.
 
 **Stacked emotion mix by domain and corpus**
 
@@ -205,6 +213,33 @@ This is a **window proxy** for aspect-based emotion (emotion of local context; a
 **Emotion difference heatmap** (Corpus A − Corpus B; `*` survives multiple-testing correction)
 
 ![Emotion difference heatmap](docs/figures/p3_19_emotion_difference_heatmap.png)
+
+### True ABSA (aspect = the seed term)
+
+Trained aspect model `yangheng/deberta-v3-base-absa-v1.1`. Input is `[CLS] raw sentence [SEP] anchor [SEP]`. Same author-cap / polysemy / FDR protocol as the window tests. 8,911 pairs in A, 29,679 in B (13,323 after filters used for inference).
+
+| Domain | JS | FDR q | What it means |
+|--------|---:|------:|----------------|
+| Identity | 0.219 | **0.0004** | Grief more *aspect-negative* (0.61 vs 0.42) |
+| Absence | 0.104 | **0.0004** | Migration more aspect-negative (0.49 vs 0.38) |
+| Temporal | 0.092 | **0.0004** | Migration more aspect-positive |
+| Digital | 0.040 | **0.486** | **Null** — not different |
+
+The window-emotion Digital finding (migration more *neutral*) does **not** survive as polarity *about* skype/wifi/video-call. Context emotion around the tool is not the same as attitude toward the tool. That split belongs in the paper.
+
+**ABSA polarity mix — Corpus A (migration)**
+
+![ABSA stacked A](docs/figures/p3_45_absa_stacked_domain__a.png)
+
+**ABSA polarity mix — Corpus B (grief)**
+
+![ABSA stacked B](docs/figures/p3_45_absa_stacked_domain__b.png)
+
+**ABSA difference heatmap** (migration − grief)
+
+![ABSA difference heatmap](docs/figures/p3_45_absa_difference_heatmap.png)
+
+Scripts: [`scripts/45_absa_true.py`](scripts/45_absa_true.py), [`scripts/45b_absa_figures.py`](scripts/45b_absa_figures.py).
 
 ### Co-occurrence networks
 
@@ -226,6 +261,7 @@ Two complementary designs.
 
 1. **Pooled NMF** on A+B with bootstrap stability (shared topic space, comparable prevalence).
 2. **Independent** LDA, NMF, and MiniLM on A and B *separately* (no forced alignment; tests whether Digital and Absence fall into one topic when unforced).
+3. **BERTopic** (UMAP + HDBSCAN + c-TF-IDF) in an isolated venv, same unforced Digital–Absence check.
 
 ### Pooled NMF (stability-selected)
 
@@ -312,6 +348,61 @@ LDA on B is peakier (one family-loss topic takes ~56% mean θ). NMF spreads mass
 
 Numeric tables regenerate locally under `outputs/tables/p4_33_alignment.csv`, `p4_33_topic_terms.csv`, `p4_33_digital_absence_mix.csv`, `p4_33_domain_bridges.csv`.
 
+### BERTopic (real; isolated venv)
+
+Phase 4 asked for BERTopic. It now runs as UMAP + HDBSCAN + c-TF-IDF in `.venv-bertopic` (so UMAP/HDBSCAN never touch `.venv-analysis`). Embeddings are MiniLM, precomputed on GPU. Reduction `nr_topics=15` → **14 topics per corpus**. Digital–Absence mix (exact seed pair in the top-10) is still **0**.
+
+| | Corpus A | Corpus B |
+|--|----------:|----------:|
+| Raw HDBSCAN clusters | 121 | 60 |
+| Topics after reduction | 14 | 14 |
+| Raw outliers | 48.6% | 37.4% |
+| After `reduce_outliers` | 0 | 0 |
+| Digital–Absence mix | **0** | **0** |
+
+A topic 0 is a giant generic cluster (**6,260 / 10,000**: *im / like / abroad / just…*). A7 (54 docs) and B12 (12 docs) are non-English stopword clusters. Mix = 0 only means no exact seed pair in the top-10; it does not make the topics theoretically clean.
+
+**Readable non-giant topics (top words)**
+
+| Corpus | Topic | n | Top words |
+|--------|------:|--:|-----------|
+| A | 1 | 1,055 | immigration, ice, esta |
+| A | 2 | 927 | passport, citizenship, birth, citizen |
+| A | 6 | 359 | university, gpa, study |
+| A | 5 | 273 | opt, employer, work |
+| B | 2 | 555 | dog, cat, vet |
+| B | 5 | 528 | dad, mom |
+| B | 7 | 302 | grief, support |
+| B | 6 | 210 | baby, pregnant |
+| B | 3 | 256 | love, miss |
+
+Scripts: [`scripts/46_bertopic_embed.py`](scripts/46_bertopic_embed.py), [`scripts/46_bertopic_run.py`](scripts/46_bertopic_run.py). Interactive HTML stays under local `outputs/figures/p4_46_*` (large files, not copied here).
+
+---
+
+## Phase 5 - time from first post
+
+`phases/New.docx` asks four things on top of the static 10k/10k frame: tag every post by distance from the author's first post; test whether **sadness decays** in grief but stays flat in migration; replace static topics with **topics over time**; compare Year-1 vs Year-3+ PPMI graphs for **betweenness spikes** (hybrid nodes / *points de capiton*).
+
+**T0 is a proxy.** It is the first post *in this sample*, not the date of migration or death. 9,375 / 9,107 authors appear once, so 97.9% / 96.0% of posts sit in author-relative quarter 0. Author-relative Year 3+ has **5** migration posts and **14** grief posts. Calendar time (from 2023-07-01) is the dual clock that still has thousands of posts in Year 3+.
+
+Corpus B is the **bereavement comparandum**, not a homeland panel watching migrants leave. The decay hypothesis is tested on B as written; it is not relabelled.
+
+**Sadness slopes (primary: window DistilRoBERTa, all posts, bin means, BH-FDR).** Calendar time: migration slope −0.0016 (p = 0.28, q = 0.85); grief +0.0005 (p = 0.71, q = 0.86). Both **stationary / null**. The same null holds for full-post emotion, Theil–Sen, permutation tests, and author-clustered post-level OLS on the calendar clock. Grief does **not** show the predicted decay.
+
+![Sadness over calendar time (window)](docs/figures/p5_44_sadness_over_time__calendar__window.png)
+
+**Topics over time.** Two stacks: (1) MiniLM + KMeans k=12 with global topic identity, then quarter prevalence; (2) literal BERTopic `topics_over_time` (`p5_46_*`, local outputs). Unforced Digital–Absence mix remains **0**, including NMF fitted separately on each calendar year. Migration still grows a homesickness cluster (`cry / lonely / regret / homesickness`); grief stays in family-illness / caregiver space.
+
+![Topics over calendar time A](docs/figures/p5_44_topics_over_time__a__calendar.png)
+![Topics over calendar time B](docs/figures/p5_44_topics_over_time__b__calendar.png)
+
+**Early vs late graphs.** PPMI co-occurrence, Year 1 vs Year 3+, betweenness. After English + multilingual closed-class filters, calendar-late spikes are small lexical items, not seed-domain bridges. The only hybrid that meets the spike-and-domain rule is the Temporal seed **`miles`** on migration calendar time, with Δ betweenness ≈ 0.0001. Top-25 betweenness Jaccard across early/late is ~0–0.06. The *Aufhebung* / hybrid-node claim is **not supported**.
+
+![Betweenness change A calendar](docs/figures/p5_44_betweenness_delta__a__calendar.png)
+
+Scripts: `40_temporal_stratify.py` → `41_emotion_over_time.py` → `42_topics_over_time.py` → `43_temporal_graphs.py` → `44_temporal_figures.py`.
+
 ---
 
 ## What holds vs what is weak
@@ -319,14 +410,17 @@ Numeric tables regenerate locally under `outputs/tables/p4_33_alignment.csv`, `p
 | Holds on 10k / 10k | Weak / incomplete |
 |--------------------|-------------------|
 | Documented 10k/10k sampling frame with quotas | Most individual anchors still too rare for inference |
-| Domain-level PPMI contrast (4/4 FDR) | True ABSA not trained (window proxy only) |
+| Domain-level PPMI contrast (4/4 FDR) | Window emotion is not the same as aspect polarity |
 | Frozen BERT neighbour stability | Manual coding of the 150-window sample |
-| Emotion differences for all four domains | W2V/FT neighbours weaker than BERT |
+| Window emotion differs for all four domains | W2V/FT neighbours weaker than BERT |
+| True ABSA: identity / absence / temporal differ | **Digital ABSA is null** (q = 0.486); window-emotion Digital was context, not aspect |
 | Pooled NMF 11/12 core topics at k=12 | BERT/PPMI disagree on the sign of digital vs temporal |
-| Independent models: **no Digital–Absence mix** | Digital too sparse (~8% posts; ~2.6% strict) to surface as its own topic |
+| LDA / NMF / MiniLM / BERTopic: **no Digital–Absence mix** | BERTopic A topic 0 is a 6,260-post catch-all; two non-English clusters |
 | Declared pair hypotheses scored honestly | Paper text not written yet |
+| Calendar sadness **stationary in both** corpora | Author-relative T0 cannot recover the origin event; Year 3+ is almost empty |
+| Topics-over-time; mix still 0 | Hybrid betweenness nodes essentially absent (`miles` only) |
 
-**For the paper:** report PPMI and BERT together. Do not headline Word2Vec/FastText neighbours. Prefer domain-level claims. State that independent topic models do not recover a Digital–Absence cluster.
+**For the paper:** report PPMI and BERT together. Report window emotion **and** true ABSA; they disagree on Digital. Do not headline Word2Vec/FastText neighbours. Prefer domain-level claims. State that independent topic models and BERTopic do not recover a Digital–Absence cluster.
 
 ---
 
@@ -342,12 +436,18 @@ Numeric tables regenerate locally under `outputs/tables/p4_33_alignment.csv`, `p
 | cos\* PPMI vs BERT | [p2_23_cosstar_ppmi_vs_contextual.png](docs/figures/p2_23_cosstar_ppmi_vs_contextual.png) |
 | Emotion stacked bars | [p3_19_emotion_stacked_domain.png](docs/figures/p3_19_emotion_stacked_domain.png) |
 | Emotion difference heatmap | [p3_19_emotion_difference_heatmap.png](docs/figures/p3_19_emotion_difference_heatmap.png) |
+| True ABSA stacked A / B | [p3_45_absa_stacked_domain__a.png](docs/figures/p3_45_absa_stacked_domain__a.png), [p3_45_absa_stacked_domain__b.png](docs/figures/p3_45_absa_stacked_domain__b.png) |
+| True ABSA difference heatmap | [p3_45_absa_difference_heatmap.png](docs/figures/p3_45_absa_difference_heatmap.png) |
 | Seed-domain co-occurrence A | [p3_20_cooccurrence__a.png](docs/figures/p3_20_cooccurrence__a.png) |
 | Seed-domain co-occurrence B | [p3_20_cooccurrence__b.png](docs/figures/p3_20_cooccurrence__b.png) |
 | Topic prevalence (pooled NMF) | [p4_20_topic_prevalence.png](docs/figures/p4_20_topic_prevalence.png) |
 | Topic stability (pooled NMF) | [p4_20_topic_stability.png](docs/figures/p4_20_topic_stability.png) |
 | Independent topic network A | [p4_33_topic_network__a.png](docs/figures/p4_33_topic_network__a.png) |
 | Independent topic network B | [p4_33_topic_network__b.png](docs/figures/p4_33_topic_network__b.png) |
+| Sadness over calendar time | [p5_44_sadness_over_time__calendar__window.png](docs/figures/p5_44_sadness_over_time__calendar__window.png) |
+| Topics over time A | [p5_44_topics_over_time__a__calendar.png](docs/figures/p5_44_topics_over_time__a__calendar.png) |
+| Topics over time B | [p5_44_topics_over_time__b__calendar.png](docs/figures/p5_44_topics_over_time__b__calendar.png) |
+| Betweenness change A | [p5_44_betweenness_delta__a__calendar.png](docs/figures/p5_44_betweenness_delta__a__calendar.png) |
 
 Longer methods write-up: [`docs/METHODS_RESULTS.md`](docs/METHODS_RESULTS.md).
 
@@ -385,7 +485,23 @@ python -m venv .venv-analysis
 .\.venv-analysis\Scripts\python.exe run_contextual_phase2.py
 .\.venv-analysis\Scripts\python.exe run_predictive_phase2.py
 .\.venv-analysis\Scripts\python.exe scripts\33_phase4_full_compare.py
+.\.venv-analysis\Scripts\python.exe scripts\45_absa_true.py
+.\.venv-analysis\Scripts\python.exe scripts\45b_absa_figures.py
+.\.venv-analysis\Scripts\python.exe scripts\40_temporal_stratify.py
+.\.venv-analysis\Scripts\python.exe scripts\41_emotion_over_time.py
+.\.venv-analysis\Scripts\python.exe scripts\42_topics_over_time.py --skip-bertopic
+.\.venv-analysis\Scripts\python.exe scripts\43_temporal_graphs.py
+.\.venv-analysis\Scripts\python.exe scripts\44_temporal_figures.py
 .\.venv-analysis\Scripts\python.exe -m pytest
+```
+
+BERTopic is a **separate** venv so UMAP/HDBSCAN never touch the analysis stack:
+
+```powershell
+python -m venv .venv-bertopic
+.\.venv-bertopic\Scripts\python.exe -m pip install bertopic
+.\.venv-analysis\Scripts\python.exe scripts\46_bertopic_embed.py
+.\.venv-bertopic\Scripts\python.exe scripts\46_bertopic_run.py
 ```
 
 Rebuild the raw archive only if needed (not required to analyse the CSVs already in this repo):

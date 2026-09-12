@@ -177,3 +177,23 @@ export:
   excel: true
   float_decimals: 4
   excel_max_rows: 50000            # windows table goes to CSV only
+
+# Phase 5 / New.docx: user-anchored timelines. T0 is the author's first
+# recorded post in THIS sample — a proxy, not the true migration/loss date.
+temporal:
+  quarter_months: 3
+  halfyear_months: 6
+  year1_max_months: 12             # Task 4 "Year 1"
+  year3_min_months: 24             # Task 4 "Year 3+"
+  calendar_origin: "2023-07-01"    # Phase 1 window start; dual-clock sensitivity
+  min_bin_posts: 30
+  n_bootstrap: 2000
+  n_permutations: 2000
+  betweenness_spike_ratio: 2.0
+  topic_k: 12
+  minilm_model: "all-MiniLM-L6-v2"
+  fullpost_max_length: 256
+  corpus_roles:
+    a: migrant                     # New.docx stationarity hypothesis
+    b: grief_comparandum           # bereavement corpus, NOT a homeland panel
+

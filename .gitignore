@@ -1,6 +1,7 @@
 # --- Python / tooling ---
 .venv/
 .venv-analysis/
+.venv-bertopic/
 __pycache__/
 *.py[cod]
 *$py.class
