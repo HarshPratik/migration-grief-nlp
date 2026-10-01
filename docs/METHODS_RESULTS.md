@@ -1,6 +1,6 @@
 # Methods and results on the current corpora (no new scraping)
 
-**Last updated:** 2026-09-11 (true ABSA §4.1 + real BERTopic §5.3 added)  
+**Last updated:** 2026-10-01 (human annotation validation §4.2 added)  
 **Analysis corpora:** Corpus A (migration) **10,000** posts; Corpus B (grief) **10,000** posts (`data/analysis/`).  
 **Seed dictionary:** 4 domains, **71** anchors (`config/anchors.yaml`, from `phases/Seed Dictionary.docx`).  
 **Sampling:** Arctic Shift rebuild, seed `20260827`, window `2023-07-01 ≤ created_at < 2026-08-24`. See `data/processed/PHASE1_COMPLETE.md`.
@@ -181,7 +181,7 @@ Already complete on the analysis corpora; not re-scraped.
 | Domain Digital | **q = 0.0003** (neutral A−B = +0.21) |
 | ABSA | Window **proxy** (emotion of local context; aspect = anchor) — superseded/complemented by §4.1 true ABSA |
 | Networks | PPMI co-occurrence, top 300 edges, GraphML + plots |
-| Annotation sample | 150 windows prepared (manual coding still human work) |
+| Annotation sample | 150 windows **coded by human** and scored — see §4.2 |
 
 Figures: `p3_19_emotion_stacked_domain.png`, `p3_19_emotion_difference_heatmap.png`, `p3_20_cooccurrence__{a,b}.png`.
 
@@ -199,6 +199,36 @@ Figures: `p3_19_emotion_stacked_domain.png`, `p3_19_emotion_difference_heatmap.p
 | Digital | **JS 0.040, q = 0.486 — NOT different.** The §4 window-emotion Digital effect (neutral +0.21 in migration) does **not** survive as aspect-directed polarity: it was emotion of the surrounding context, not attitude toward the digital tool itself |
 
 Tables: `p3_45_absa_comparison.csv`, `p3_45_absa_distribution_matrix.csv`. Figures: `p3_45_absa_stacked_domain__{a,b}.png`, `p3_45_absa_difference_heatmap.png`. Scored pairs: `data/analysis/absa_{a,b}_deberta-v3-base-absa-v1_1.parquet`.
+
+### 4.2 Human validation of the window-emotion labels (added 2026-10-01)
+
+The 150-window sample (`p3_22`, corpus × domain stratified, non-polysemous anchors preferred) was coded blind: category (`aspect_owned` / `surrounding_context` / `ambiguous` / `wrong_anchor_match`), dominant emotion, confidence 1–3. Model labels stayed hidden until coding was complete. Script: `scripts/47_annotation_agreement.py`.
+
+| Human category | n | share |
+|----------------|--:|------:|
+| aspect_owned | 31 | 20.7% |
+| surrounding_context | 50 | 33.3% |
+| ambiguous | 15 | 10.0% |
+| wrong_anchor_match | 54 | 36.0% |
+
+| Subset | n | accuracy | Cohen's κ |
+|--------|--:|---------:|----------:|
+| aspect_owned only | 31 | 0.419 | 0.097 |
+| aspect_owned + surrounding_context (primary) | 81 | 0.444 | 0.229 |
+| all coded rows | 150 | 0.460 | 0.217 |
+
+| Auxiliary check | Result |
+|-----------------|--------|
+| Model `p_max`, agrees vs disagrees (primary subset) | 0.855 vs 0.647, Mann–Whitney p = 3.4e-6 |
+| Coder confidence 3 rows | 68.2% agreement |
+| Coder confidence 1–2 rows | ~35% agreement |
+| Human emotion mix on aspect_owned | sadness 24 / neutral 4 / anger 2 / joy 1 (77% sadness) |
+
+**Polysemy-flag audit.** All 150 sampled windows were on anchors flagged `polysemous: false`, yet the coder still rejected 54 as wrong-sense matches (`internet` 12, `schedule` 7, `weekend` 5, `alone`/`forgotten`/`distance`/`whatsapp` 4 each). The flag under-detects surface-sense drift — e.g. *distance* in "long distance relationship", *internet* as infrastructure rather than contact medium. Concentrated in Corpus A (38/54; `a/digital` is 79% wrong-sense), rare in grief absence/identity.
+
+**Interpretation for the write-up.** (i) Window-emotion labels are a *context* proxy: only ~1/5 of scored windows carry emotion about the seed term, so §4 numbers describe the neighbourhood's affect, not the anchor's. (ii) Per-window labels are too noisy to quote individually; domain-level distributions remain defensible because confidence is calibrated and errors are not obviously corpus-skewed in the same direction. (iii) This sharpens §4.1: the true-ABSA Digital null is unsurprising when half of Digital's sampled windows are wrong-sense matches — aspect-directed measurement was needed, and it is the instrument that should carry aspect-level claims.
+
+Tables: `p3_47_annotation_{agreement,categories,confusion,by_stratum,by_confidence,wrong_anchors,coding}.csv`. Figures: `p3_47_annotation_categories.png`, `p3_47_annotation_confusion.png`. Summary: `outputs/summaries/p3_47_annotation_agreement.json`. All row-level outputs stay local (contain post excerpts).
 
 ---
 
@@ -259,7 +289,7 @@ Tables: `p4_46_bertopic_topics__{a,b}.csv` (top-10 c-TF-IDF words + weights), `p
 1. **Domain-level** analysis (4 seed domains) under both PPMI and BERT.  
 2. **Frozen BERT** sense vectors with document-level caching (stable split-half reliability).  
 3. **PPMI** collocational contrast (clearer A/B *divergence* in cos*).  
-4. **Emotion window proxy** with author clustering + FDR (all four domains, q=0.0003).  
+4. **Emotion window proxy** with author clustering + FDR (all four domains, q=0.0003) — now human-validated as a *domain-distribution* instrument only (§4.2).  
 5. **NMF with stability** (honest: 11/12 core at k=12). Independent LDA/NMF/MiniLM agree that Digital–Absence does not cluster together when unforced.  
 6. **Reliability gates** — prevents publishing neighbour lists as findings when they are chance-level.
 7. **Honest temporal nulls** — calendar sadness stationary in both corpora; Digital–Absence still never mixes; hybrid betweenness almost absent.
@@ -274,6 +304,7 @@ Tables: `p4_46_bertopic_topics__{a,b}.csv` (top-10 c-TF-IDF words + weights), `p
 6. **Declared pair hypotheses vs 10k CIs** — BERT finds all four pair differences, but *temporal vs absence* is closer in migration, not grief; BERT and PPMI disagree on the sign of *digital vs temporal*.
 7. **Author-relative T0** — 95% singleton authors; cannot recover the origin event. Calendar time is the usable clock.
 8. **BERTopic granularity/outlier trade-off** — HDBSCAN `min_cluster_size=10` yields 60–121 raw clusters but 37–49% outliers (reassigned via embedding-space nearest topic); larger `min_cluster_size` collapses to 4–7 mega-topics. The 14-topic reduction is a comparability choice, not a data-driven optimum.
+9. **Per-window emotion labels** — human audit (§4.2): only 20.7% of scored windows are aspect-owned, 36% are wrong-sense matches on *non-polysemous* anchors, and human–model label agreement is κ = 0.23 on usable windows. The polysemy flag does not catch this drift; domain distributions survive, single-window claims do not.
 
 ### Methodological lesson (BERT ABTT)
 
@@ -316,6 +347,13 @@ cd D:\research_paper
 ```powershell
 .\.venv-analysis\Scripts\python.exe scripts\46_bertopic_embed.py   # GPU MiniLM embeddings
 .\.venv-bertopic\Scripts\python.exe scripts\46_bertopic_run.py     # UMAP+HDBSCAN+c-TF-IDF + DTM
+```
+
+### Annotation agreement (Phase 3 validation)
+
+```powershell
+# after the coded workbook/CSV is back in annotation/
+.\.venv-analysis\Scripts\python.exe scripts\47_annotation_agreement.py
 ```
 
 ### Phase 5 temporal follow-up (New.docx)

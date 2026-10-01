@@ -37,8 +37,9 @@ This README is the results front page. Longer methods notes: [`docs/METHODS_RESU
 | | |
 |--|--|
 | **Computational pipeline** | **Done** on the 10k / 10k analysis frame (Phases 1–5) |
+| **Human validation** | **Done** — 150/150 windows coded; agreement reported below |
 | **Ready for** | Drafting the paper from the results below |
-| **Not finished** | Human coding of 150 emotion windows; the paper text itself |
+| **Not finished** | The paper text itself |
 | **Repo** | **Private.** Row-level CSVs contain Reddit post text — do not make public without ethics review |
 
 **Done**
@@ -50,10 +51,13 @@ This README is the results front page. Longer methods notes: [`docs/METHODS_RESU
 - Phase 4: pooled NMF **k = 12** (11/12 core); independent LDA/NMF (k = 10, 12, 15); MiniLM k = 12; **real BERTopic** 14/14 topics. Unforced Digital–Absence mix = **0** on every method.
 - Phase 5: author-relative timelines, sadness slopes, MiniLM and BERTopic topics-over-time, early vs late PPMI betweenness. **Sadness is stationary in both corpora. Hybrid-node claim is not supported.**
 
+**Done by hand**
+
+- Human coding of the 150-window sample: complete (2026-10-01). Results under [Phase 3 — human validation](#human-validation-of-the-window-labels).
+
 **Still human work**
 
-1. Code 150 emotion windows (local pack, not in git: `annotation/emotion_windows_150.xlsx` / `.html`). Do not open “MODEL GUESSES” until all 150 rows are coded.
-2. Write the paper. Prefer **domain-level** claims. Declared pair hypotheses mostly fail or split by method — report that honestly.
+1. Write the paper. Prefer **domain-level** claims. Declared pair hypotheses mostly fail or split by method — report that honestly.
 
 ---
 
@@ -204,7 +208,7 @@ Both methods put *temporal vs absence* **closer in migration**, opposite the bri
 | Temporal | **Different** | 0.0003 | sadness higher in grief; more neutral in migration |
 | Digital | **Different** | 0.0003 | **neutral +0.21** in migration |
 
-This DistilRoBERTa run is a **window proxy**: it scores emotion of the local context, not attitude toward the seed term. Human coding of 150 windows is still required before treating those labels as validated.
+This DistilRoBERTa run is a **window proxy**: it scores emotion of the local context, not attitude toward the seed term. The human audit below quantifies exactly how noisy that proxy is.
 
 **Stacked emotion mix by domain and corpus**
 
@@ -240,6 +244,33 @@ The window-emotion Digital finding (migration more *neutral*) does **not** survi
 ![ABSA difference heatmap](docs/figures/p3_45_absa_difference_heatmap.png)
 
 Scripts: [`scripts/45_absa_true.py`](scripts/45_absa_true.py), [`scripts/45b_absa_figures.py`](scripts/45b_absa_figures.py).
+
+### Human validation of the window labels
+
+All **150/150** sampled windows were hand-coded blind (model labels kept on a separate sheet). Each window got a category — is the emotion *about the seed term*? — plus a dominant emotion and a confidence.
+
+| Human category | n | share |
+|----------------|--:|------:|
+| aspect_owned (emotion is about the seed term) | 31 | 20.7% |
+| surrounding_context (emotional, not about the term) | 50 | 33.3% |
+| ambiguous | 15 | 10.0% |
+| wrong_anchor_match (term used in another sense) | 54 | **36.0%** |
+
+Three findings matter for the paper:
+
+1. **Only ~1 in 5 scored windows is aspect-owned.** The window-emotion signal is mostly context — exactly the caveat the proxy carries. Worse, every wrong-sense match sits on an anchor the dictionary flags as *non-polysemous* (`internet` 12, `schedule` 7, `weekend` 5, `alone`/`forgotten`/`distance`/`whatsapp` 4 each). The flag under-detects surface-sense drift; this is concentrated in Corpus A (38/54 wrong matches; `a/digital` is 79% wrong-sense) and barely present in grief absence/identity strata.
+2. **Label agreement is fair at best.** Human vs model on windows where a human saw real emotion (aspect + context, n = 81): accuracy **0.44**, Cohen's κ **0.23**. On aspect-owned only (n = 31): accuracy 0.42, κ 0.10. The human aspect-owned labels are 77% sadness — the classes that exist in these corpora are the ones the model confuses least (sadness→sadness is the big diagonal cell).
+3. **Model confidence is informative.** Mean `p_max` on human-agreeing windows 0.85 vs 0.65 on disagreements (Mann–Whitney p ≈ 3.4e-6); coder confidence 3 rows agree 68% vs ~35% for confidence 1–2. Domain-level distributions over thousands of windows can still carry real signal even when per-window labels are coin-flippy — but per-window labels should not be quoted, and aspect-directed claims belong to the true ABSA (above), not the window proxy.
+
+![Human coding by stratum](docs/figures/p3_47_annotation_categories.png)
+
+*Share of each corpus × domain stratum the coder assigned to each category. Corpus A is dominated by wrong-sense matches; grief absence/identity windows are the most aspect-owned.*
+
+![Human vs model confusion](docs/figures/p3_47_annotation_confusion.png)
+
+*Human label (row) vs model label (column) on the 81 windows with a real emotion. Agreement is concentrated on sadness and neutral.*
+
+Script: [`scripts/47_annotation_agreement.py`](scripts/47_annotation_agreement.py). Tables: `outputs/tables/p3_47_*` (local only — row-level text stays out of git).
 
 ### Co-occurrence networks
 
@@ -411,8 +442,9 @@ Scripts: `40_temporal_stratify.py` → `41_emotion_over_time.py` → `42_topics_
 |--------------------|-------------------|
 | Documented 10k/10k sampling frame with quotas | Most individual anchors still too rare for inference |
 | Domain-level PPMI contrast (4/4 FDR) | Window emotion is not the same as aspect polarity |
-| Frozen BERT neighbour stability | Manual coding of the 150-window sample |
-| Window emotion differs for all four domains | W2V/FT neighbours weaker than BERT |
+| Frozen BERT neighbour stability | Human audit: only 21% of scored windows are aspect-owned; 36% are wrong-sense matches the polysemy flag misses |
+| Window emotion differs for all four domains | Per-window labels agree with a human only 0.44 (κ 0.23) — report domain distributions, never single windows |
+| Human audit of 150 windows done | Model confidence is calibrated (p_max 0.85 vs 0.65); coder-sure rows agree 68% |
 | True ABSA: identity / absence / temporal differ | **Digital ABSA is null** (q = 0.486); window-emotion Digital was context, not aspect |
 | Pooled NMF 11/12 core topics at k=12 | BERT/PPMI disagree on the sign of digital vs temporal |
 | LDA / NMF / MiniLM / BERTopic: **no Digital–Absence mix** | BERTopic A topic 0 is a 6,260-post catch-all; two non-English clusters |
@@ -420,7 +452,7 @@ Scripts: `40_temporal_stratify.py` → `41_emotion_over_time.py` → `42_topics_
 | Calendar sadness **stationary in both** corpora | Author-relative T0 cannot recover the origin event; Year 3+ is almost empty |
 | Topics-over-time; mix still 0 | Hybrid betweenness nodes essentially absent (`miles` only) |
 
-**For the paper:** report PPMI and BERT together. Report window emotion **and** true ABSA; they disagree on Digital. Do not headline Word2Vec/FastText neighbours. Prefer domain-level claims. State that independent topic models and BERTopic do not recover a Digital–Absence cluster.
+**For the paper:** report PPMI and BERT together. Report window emotion **and** true ABSA; they disagree on Digital. Report the human audit alongside window emotion — the labels are a noisy context proxy, not per-window truth. Do not headline Word2Vec/FastText neighbours. Prefer domain-level claims. State that independent topic models and BERTopic do not recover a Digital–Absence cluster.
 
 ---
 
@@ -438,6 +470,8 @@ Scripts: `40_temporal_stratify.py` → `41_emotion_over_time.py` → `42_topics_
 | Emotion difference heatmap | [p3_19_emotion_difference_heatmap.png](docs/figures/p3_19_emotion_difference_heatmap.png) |
 | True ABSA stacked A / B | [p3_45_absa_stacked_domain__a.png](docs/figures/p3_45_absa_stacked_domain__a.png), [p3_45_absa_stacked_domain__b.png](docs/figures/p3_45_absa_stacked_domain__b.png) |
 | True ABSA difference heatmap | [p3_45_absa_difference_heatmap.png](docs/figures/p3_45_absa_difference_heatmap.png) |
+| Human coding by stratum | [p3_47_annotation_categories.png](docs/figures/p3_47_annotation_categories.png) |
+| Human vs model confusion | [p3_47_annotation_confusion.png](docs/figures/p3_47_annotation_confusion.png) |
 | Seed-domain co-occurrence A | [p3_20_cooccurrence__a.png](docs/figures/p3_20_cooccurrence__a.png) |
 | Seed-domain co-occurrence B | [p3_20_cooccurrence__b.png](docs/figures/p3_20_cooccurrence__b.png) |
 | Topic prevalence (pooled NMF) | [p4_20_topic_prevalence.png](docs/figures/p4_20_topic_prevalence.png) |
@@ -492,6 +526,7 @@ python -m venv .venv-analysis
 .\.venv-analysis\Scripts\python.exe scripts\42_topics_over_time.py --skip-bertopic
 .\.venv-analysis\Scripts\python.exe scripts\43_temporal_graphs.py
 .\.venv-analysis\Scripts\python.exe scripts\44_temporal_figures.py
+.\.venv-analysis\Scripts\python.exe scripts\47_annotation_agreement.py
 .\.venv-analysis\Scripts\python.exe -m pytest
 ```
 
@@ -515,7 +550,7 @@ python scripts/08_reprocess_tokens.py
 
 Tables and extra figures land under `outputs/` locally (gitignored). Published figures live in `docs/figures/`.
 
-Annotation pack (local only): `python scripts/22_annotation_sample.py --replace` then `python scripts/32_make_annotation_workbook.py`.
+Annotation pack (local only): `python scripts/22_annotation_sample.py --replace` then `python scripts/32_make_annotation_workbook.py`. After the workbook comes back coded: `python scripts/47_annotation_agreement.py` (scores human vs model; writes `outputs/tables/p3_47_*`).
 
 ---
 

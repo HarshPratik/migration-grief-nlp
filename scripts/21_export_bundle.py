@@ -21,11 +21,16 @@ from analysis_io import banner, item  # noqa: E402
 SAFE_TABLE_PREFIXES = (
     "p2_09_", "p2_10_", "p2_13_", "p2_14_",
     "p3_15_", "p3_16_",
+    # p3_47 aggregate audit tables only; p3_47_annotation_coding carries post_ids
+    # and stays restricted (not prefix-matched by the entries below).
+    "p3_47_annotation_agreement", "p3_47_annotation_categories",
+    "p3_47_annotation_confusion", "p3_47_annotation_by_stratum",
+    "p3_47_annotation_by_confidence", "p3_47_annotation_wrong_anchors",
     "p4_17_topic_terms", "p4_17_topic_prevalence", "p4_17_k_sweep",
 )
 SAFE_SUMMARY_PREFIXES = (
     "p2_09_", "p2_10_", "p2_13_", "p2_14_", "p2_18_",
-    "p3_15_", "p3_16_", "p3_19_",
+    "p3_15_", "p3_16_", "p3_19_", "p3_47_annotation_agreement",
     "p4_17_", "p4_20_",
 )
 
